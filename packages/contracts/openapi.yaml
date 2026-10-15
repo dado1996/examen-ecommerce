@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info:
+  title: Core E-Commerce Checkout API
+  version: 0.1.0
+  description: >
+    Contrato único entre frontend y backend. Los tipos TypeScript del frontend
+    se generan a partir de este archivo.
+servers:
+  - url: http://localhost:8080/api/v1
+
+# Pendiente: catálogo de productos y checkout (se definen junto con la spec del motor).
+paths: {}
+
+components:
+  schemas:
+    Problem:
+      description: Error en formato Problem Details (RFC 9457)
+      type: object
+      required: [title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          description: Código de negocio estable para que el frontend muestre el mensaje adecuado

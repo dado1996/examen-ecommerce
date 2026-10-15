@@ -1,0 +1,31 @@
+# --- Sistema operativo / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# --- Variables de entorno (nunca versionar secretos) ---
+.env
+.env.*
+!.env.example
+
+# --- Backend (Java / Maven) ---
+apps/backend/target/
+apps/backend/data/*.db
+apps/backend/data/*.db-journal
+*.class
+*.log
+hs_err_pid*
+
+# --- Frontend (Node / Angular) ---
+node_modules/
+apps/frontend/dist/
+apps/frontend/.angular/
+apps/frontend/coverage/
+npm-debug.log*
+
+# --- Claude Code: configuración personal (la del proyecto sí se versiona) ---
+.claude/settings.local.json
