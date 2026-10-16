@@ -51,13 +51,13 @@ Detalle, decisiones y pendientes de integración en [`packages/schema/README.md`
 
 ```
 core/
-  api/      # CatalogApi (GET /products) y el token API_BASE_URL
-  models/   # Product, escrito a mano según el contrato (pendiente: generarlo)
-  money/    # formatMoney (formato del texto) y cents (aritmética exacta en centavos bigint)
+  api/      # CatalogApi (GET /products), CheckoutApi (POST /checkouts/preview), readProblem y API_BASE_URL
+  models/   # Product y tipos del checkout, escritos a mano según el contrato (pendiente: generarlos)
+  money/    # formatMoney, cents (centavos bigint) y decimal (HALF_EVEN y porcentajes, sin number)
 features/
   catalog/  # CatalogPage: lista de productos y selección de cantidades (HU1)
   cart/     # CartStore: estado del carrito con Signals (HU1)
-  checkout/ # CheckoutPage (productos, subtotal y cupón) y cartNotEmptyGuard (pendiente: desglose y confirmación, HU2 y HU4)
+  checkout/ # CheckoutPage (productos, cupón, desglose y alerta del tope), mensajes por code y cartNotEmptyGuard (pendiente: confirmar la compra)
 shared/     # Componentes de UI reutilizables
 ```
 
@@ -66,6 +66,10 @@ shared/     # Componentes de UI reutilizables
 - **Cantidades saneadas en el cliente.** Una cantidad negativa, decimal o no numérica se corrige a un entero entre 0 y `availableStock`. Al recargar el catálogo, `reconcile` recorta la selección al stock vigente y quita los productos que ya no están. Es una ayuda de UX: el backend vuelve a validar todo.
 - **Al checkout solo se entra desde el botón.** `cartNotEmptyGuard` redirige a `/` si el carrito está vacío. Como el carrito vive en memoria, eso cubre una URL escrita a mano y una recarga de la página.
 - **El cupón se guarda en el carrito sin validarlo.** `CartStore` guarda el texto tal como se escribió (hasta 50 caracteres, el máximo del contrato) y expone una versión sin espacios, o `null` si está en blanco, para enviarla. El backend decide si es válido o expiró.
+- **"Aplicar descuento" usa el preview del backend.** No hay tabla de cupones: el cupón vive en `discounts.coupon` (regla de `CLAUDE.md`). El botón envía el carrito y el cupón a `POST /checkouts/preview`, que valida el cupón (`INVALID_COUPON`, `COUPON_EXPIRED`) y calcula la cascada completa: categoría, volumen, cupón y tope. No guarda la compra ni reserva stock. Sin cupón, calcula solo los demás descuentos.
+- **El frontend no recalcula descuentos, solo los muestra.** Cada paso llega sin redondear y se muestra redondeado `HALF_EVEN` (la misma regla del backend) con aritmética `bigint`. El ajuste del tope se muestra como la suma de esos pasos menos el `discountTotal` del backend, para que el desglose siempre cuadre a la vista. Sin tope, la suma de los pasos redondeados puede diferir en un centavo del descuento total; el total autoritativo es siempre el del backend.
+- **Errores por `code`, nunca por `detail`.** `readProblem` reduce cualquier error a un `code` del contrato, o a `NETWORK_ERROR` o `UNKNOWN_ERROR`. Los errores del cupón se muestran junto al campo (`aria-invalid` y `aria-describedby`). Los demás, como el stock insuficiente, se muestran como alerta y nombran el producto. Cambiar el cupón descarta el desglose y el error anteriores.
+- **Alerta del tope (HU4).** Si `capApplied` es `true`, se muestra un `role="alert"` con el tope y el descuento limitado. Con la configuración actual no se alcanza (máximo 27,325%), así que solo la cubren las pruebas unitarias.
 - **Sin correo electrónico.** Se evaluó pedirlo en el checkout, pero no está en el contrato (`CheckoutRequest` es cerrado) y `users` exige también el nombre. Se decidió no incluirlo.
 - **Dinero solo como texto.** `formatMoney("1200.00")` da `"USD 1,200.00"` insertando separadores sobre el string, sin pasar por `number`.
 - **Accesibilidad básica:** `lang="es"`, enlace para saltar al contenido, un título de página por ruta, foco visible, etiquetas que nombran el producto ("Cantidad de Cuaderno"), botones `−`/`+` con nombre accesible, estados de carga (`role="status"`) y de error (`role="alert"`) anunciados, resumen del carrito en una región `aria-live`, tabla del checkout con `caption` y encabezados con `scope` (en pantallas angostas oculta la columna de precio y muestra "2 × USD 1,200.00" bajo el nombre), áreas táctiles de 44 px y colores con contraste AA.
