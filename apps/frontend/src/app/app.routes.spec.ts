@@ -7,6 +7,7 @@ import { routes } from './app.routes';
 import { CatalogApi } from './core/api/catalog-api';
 import { CheckoutApi } from './core/api/checkout-api';
 import { CartStore } from './features/cart/cart-store';
+import { ConfirmationStore } from './features/confirmation/confirmation-store';
 
 describe('routes', () => {
   beforeEach(() => {
@@ -41,6 +42,31 @@ describe('routes', () => {
 
     expect(TestBed.inject(Router).url).toBe('/');
     expect(harness.routeNativeElement?.querySelector('h2')?.textContent).toContain('Productos');
+  });
+
+  it('la ruta /confirmacion muestra la compra recién confirmada', async () => {
+    TestBed.inject(ConfirmationStore).set({
+      id: 5,
+      createdAt: '2026-10-15T19:30:00.000Z',
+      couponCode: null,
+      lines: [],
+      discounts: [],
+      subtotal: '40.00',
+      discountTotal: '0.00',
+      total: '40.00',
+      maxDiscountRate: '0.35',
+      capApplied: false,
+    });
+
+    const harness = await RouterTestingHarness.create('/confirmacion');
+
+    expect(harness.routeNativeElement?.querySelector('h2')?.textContent).toContain('Compra confirmada');
+  });
+
+  it('entrar a /confirmacion sin una compra confirmada redirige a la selección de productos', async () => {
+    await RouterTestingHarness.create('/confirmacion');
+
+    expect(TestBed.inject(Router).url).toBe('/');
   });
 
   it('una ruta desconocida redirige a la selección de productos', async () => {

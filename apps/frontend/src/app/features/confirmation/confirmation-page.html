@@ -1,0 +1,48 @@
+@if (checkout(); as order) {
+  <section class="confirmation" aria-labelledby="confirmation-title">
+    <div class="confirmation__header">
+      <h2 id="confirmation-title" #title tabindex="-1">Compra confirmada</h2>
+      <p class="confirmation__meta">
+        Orden n.º {{ order.id }} ·
+        <time [attr.datetime]="order.createdAt">{{ createdAt() }}</time>
+      </p>
+    </div>
+
+    @if (order.capApplied) {
+      <div class="notice notice--warning">
+        <p>
+          Se aplicó el descuento máximo del {{ maxRate() }}: tu descuento se limitó a
+          <strong>{{ formatMoney(order.discountTotal) }}</strong>.
+        </p>
+      </div>
+    }
+
+    <div class="table-wrapper">
+      <table class="order-table">
+        <caption>Productos comprados</caption>
+        <thead>
+          <tr>
+            <th scope="col">Producto</th>
+            <th scope="col" class="numeric">Cantidad</th>
+            <th scope="col" class="numeric">Precio unitario</th>
+            <th scope="col" class="numeric">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of order.lines; track line.productId) {
+            <tr>
+              <th scope="row">{{ line.name }}</th>
+              <td class="numeric">{{ line.quantity }}</td>
+              <td class="numeric">{{ formatMoney(line.unitPrice) }}</td>
+              <td class="numeric">{{ formatMoney(line.lineSubtotal) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <app-breakdown-panel [breakdown]="order" heading="Totales de tu compra" />
+
+    <a class="button button--primary confirmation__continue" routerLink="/">Seguir comprando</a>
+  </section>
+}
