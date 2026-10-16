@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 
 import { routes } from './app.routes';
 import { CatalogApi } from './core/api/catalog-api';
+import { CartStore } from './features/cart/cart-store';
 
 describe('routes', () => {
   beforeEach(() => {
@@ -19,10 +20,22 @@ describe('routes', () => {
     expect(harness.routeNativeElement?.querySelector('h2')?.textContent).toContain('Productos');
   });
 
-  it('la ruta /checkout muestra el checkout', async () => {
+  it('la ruta /checkout muestra el checkout cuando hay productos en el carrito', async () => {
+    TestBed.inject(CartStore).setQuantity(
+      { id: 1, name: 'Laptop', unitPrice: '1200.00', category: 'Tecnología', availableStock: 5 },
+      1,
+    );
+
     const harness = await RouterTestingHarness.create('/checkout');
 
     expect(harness.routeNativeElement?.querySelector('h2')?.textContent).toContain('Checkout');
+  });
+
+  it('entrar a /checkout con el carrito vacío redirige a la selección de productos', async () => {
+    const harness = await RouterTestingHarness.create('/checkout');
+
+    expect(TestBed.inject(Router).url).toBe('/');
+    expect(harness.routeNativeElement?.querySelector('h2')?.textContent).toContain('Productos');
   });
 
   it('una ruta desconocida redirige a la selección de productos', async () => {

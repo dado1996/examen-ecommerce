@@ -1,5 +1,7 @@
 import { Routes } from '@angular/router';
 
+import { cartNotEmptyGuard } from './features/checkout/cart-not-empty.guard';
+
 export const routes: Routes = [
   {
     path: '',
@@ -10,6 +12,7 @@ export const routes: Routes = [
   {
     path: 'checkout',
     title: 'Checkout · Core E-Commerce',
+    canActivate: [cartNotEmptyGuard],
     loadComponent: () => import('./features/checkout/checkout-page').then((m) => m.CheckoutPage),
   },
   { path: '**', redirectTo: '' },
