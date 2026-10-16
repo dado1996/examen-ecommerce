@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -217,6 +218,69 @@ class CheckoutApiTest extends ApiIntegrationTest {
                 .andExpect(jsonPath("$.available").value(0));
 
         assertThat(stockDe(4)).isEqualTo(stockAntes);
+    }
+
+    @Test
+    void unReintentoConLaMismaClaveDevuelveLaMismaOrdenSinDescontarStockOtraVez() throws Exception {
+        String clave = UUID.randomUUID().toString();
+        int stockAntes = stockDe(1);
+
+        String primera = confirmar(DOS_LAPTOPS_Y_LAMPARA_CON_CUPON, clave)
+                .andExpect(status().isCreated())
+                .andExpect(cumpleElContrato())
+                .andReturn().getResponse().getContentAsString();
+        String reintento = confirmar(DOS_LAPTOPS_Y_LAMPARA_CON_CUPON, clave)
+                .andExpect(status().isCreated())
+                .andExpect(cumpleElContrato())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(reintento).isEqualTo(primera);
+        assertThat(stockDe(1)).isEqualTo(stockAntes - 2);
+    }
+
+    @Test
+    void laClaveDeIdempotenciaNoDistingueMayusculas() throws Exception {
+        String clave = UUID.randomUUID().toString();
+        String pedido = """
+                {"items": [{"productId": 5, "quantity": 1}]}""";
+
+        Number id = JsonPath.read(confirmar(pedido, clave).andReturn().getResponse().getContentAsString(), "$.id");
+
+        confirmar(pedido, clave.toUpperCase())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(id));
+    }
+
+    @Test
+    void laMismaClaveConOtroCuerpoSeRechazaSinCrearOtraOrden() throws Exception {
+        String clave = UUID.randomUUID().toString();
+        confirmar("""
+                {"items": [{"productId": 5, "quantity": 1}]}""", clave).andExpect(status().isCreated());
+        int stockAntes = stockDe(5);
+
+        confirmar("""
+                {"items": [{"productId": 5, "quantity": 2}]}""", clave)
+                .andExpect(status().isConflict())
+                .andExpect(cumpleElContrato())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+
+        assertThat(stockDe(5)).isEqualTo(stockAntes);
+    }
+
+    @Test
+    void unaClaveDeIdempotenciaQueNoEsUuidSeRechazaSinCrearLaOrden() throws Exception {
+        int stockAntes = stockDe(5);
+
+        confirmar("""
+                {"items": [{"productId": 5, "quantity": 1}]}""", "no-es-un-uuid")
+                .andExpect(status().isBadRequest())
+                .andExpect(laRespuestaCumpleElContrato())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("Idempotency-Key"))
+                .andExpect(content().string(not(containsString("UUID"))));
+
+        assertThat(stockDe(5)).isEqualTo(stockAntes);
     }
 
     private int stockDe(long productId) throws Exception {

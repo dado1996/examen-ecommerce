@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.kata.checkout.domain.exception.CouponExpiredException;
 import com.kata.checkout.domain.exception.EmptyCartException;
+import com.kata.checkout.domain.exception.IdempotencyKeyReusedException;
 import com.kata.checkout.domain.exception.InsufficientStockException;
 import com.kata.checkout.domain.exception.InvalidCouponException;
 import com.kata.checkout.domain.exception.ProductNotFoundException;
@@ -15,6 +16,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -65,6 +68,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(validationProblem(List.of(unreadableField(e))));
     }
 
+    /** Un header o parámetro con un tipo inválido, p. ej. una {@code Idempotency-Key} que no es UUID. */
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException e, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        String field = e instanceof MethodArgumentTypeMismatchException argument ? argument.getName() : e.getPropertyName();
+        return ResponseEntity.badRequest().body(validationProblem(List.of(new FieldError(field, "formato inválido"))));
+    }
+
     @ExceptionHandler(EmptyCartException.class)
     ProblemDetail emptyCart(EmptyCartException e) {
         return problem(HttpStatus.BAD_REQUEST, "EMPTY_CART", "Carrito vacío", "El carrito no tiene productos.");
@@ -97,6 +108,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("requested", e.requested());
         problem.setProperty("available", e.available());
         return problem;
+    }
+
+    @ExceptionHandler(IdempotencyKeyReusedException.class)
+    ProblemDetail idempotencyKeyReused(IdempotencyKeyReusedException e) {
+        return problem(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", "Clave de idempotencia reutilizada",
+                "La clave de idempotencia ya se usó con otra solicitud.");
     }
 
     /** FK o CHECK rechazados por la base: la orden tenía datos inconsistentes y no se guardó. */

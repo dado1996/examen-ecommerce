@@ -73,6 +73,11 @@ abstract class ApiIntegrationTest {
         return mvc.perform(post("/api/v1/checkouts").contentType(MediaType.APPLICATION_JSON).content(json));
     }
 
+    protected ResultActions confirmar(String json, String idempotencyKey) throws Exception {
+        return mvc.perform(post("/api/v1/checkouts").contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", idempotencyKey).content(json));
+    }
+
     private static String leerContrato() {
         try {
             return Files.readString(Path.of("../../packages/contracts/openapi.yaml"));
