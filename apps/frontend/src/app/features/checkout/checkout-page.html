@@ -1,0 +1,61 @@
+<section class="checkout" aria-labelledby="checkout-title">
+  <div class="checkout__header">
+    <h2 id="checkout-title">Checkout</h2>
+    <a class="button" routerLink="/">Volver a productos</a>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="cart-table">
+      <caption>
+        Productos en tu carrito
+        <span class="cart-table__units">{{ cart.summary() }}</span>
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Producto</th>
+          <th scope="col" class="numeric col-unit-price">Precio unitario</th>
+          <th scope="col" class="numeric">Cantidad</th>
+          <th scope="col" class="numeric">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of cart.items(); track item.product.id) {
+          <tr>
+            <th scope="row">
+              {{ item.product.name }}
+              <span class="cart-table__unit-detail">{{ item.quantity }} × {{ formatMoney(item.product.unitPrice) }}</span>
+            </th>
+            <td class="numeric col-unit-price">{{ formatMoney(item.product.unitPrice) }}</td>
+            <td class="numeric">{{ item.quantity }}</td>
+            <td class="numeric">{{ formatMoney(item.lineTotal) }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">Subtotal <span class="cart-table__hint">antes de descuentos</span></th>
+          <td class="col-unit-price"></td>
+          <td></td>
+          <td class="numeric cart-table__subtotal">{{ formatMoney(cart.subtotal()) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="coupon">
+    <label class="coupon__label" for="coupon-code">Código de cupón <span class="coupon__optional">(opcional)</span></label>
+    <input
+      id="coupon-code"
+      class="coupon__input"
+      type="text"
+      maxlength="50"
+      autocomplete="off"
+      autocapitalize="characters"
+      spellcheck="false"
+      aria-describedby="coupon-hint"
+      [value]="cart.couponCode()"
+      (input)="onCouponInput($event)"
+    />
+    <p id="coupon-hint" class="coupon__hint">El cupón se valida al calcular los descuentos.</p>
+  </div>
+</section>
