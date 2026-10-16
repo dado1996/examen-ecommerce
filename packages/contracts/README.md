@@ -89,12 +89,13 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 
 | `code` | HTTP | Cuándo | Campos extra |
 |---|---|---|---|
-| `VALIDATION_ERROR` | 400 | JSON corrupto, tipos incorrectos, cantidad < 1 o una propiedad no permitida (p. ej. un precio). | `errors[]` con `field` y `message` |
+| `VALIDATION_ERROR` | 400 | JSON corrupto, tipos incorrectos, cantidad < 1, una propiedad no permitida (p. ej. un precio) o una `Idempotency-Key` que no es UUID. | `errors[]` con `field` y `message` |
 | `EMPTY_CART` | 400 | `items` vacío. | — |
 | `PRODUCT_NOT_FOUND` | 422 | El producto no existe o está inactivo. | `productId` |
 | `INVALID_COUPON` | 422 | El cupón no está registrado. | — |
 | `COUPON_EXPIRED` | 422 | El cupón está vencido: el instante actual es igual o posterior a `discounts.coupon.expires-at`. | — |
 | `INSUFFICIENT_STOCK` | 409 | No alcanzan las unidades; no se reservó nada. | `productId`, `requested`, `available` |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | La `Idempotency-Key` ya se usó en `POST /checkouts` con otro cuerpo; no se creó otra orden. | — |
 | `DATA_INTEGRITY_VIOLATION` | 422 | La base rechazó la orden por inconsistente; no se guardó. | — |
 | `DATABASE_UNAVAILABLE` | 503 | La base no está disponible por ahora; se puede reintentar. | — |
 | `PERSISTENCE_ERROR` | 500 | Error interno al procesar los datos. | — |
@@ -109,6 +110,7 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 | Previsualización | `POST /checkouts/preview` | Solo dos endpoints | Sin ella, el desglose y la alerta del tope solo se ven después de comprar. |
 | Respuesta del checkout | Desglose completo con `capApplied` | Solo el `id` | El frontend no repite el cálculo: muestra lo que decidió el backend. |
 | Request cerrado | `additionalProperties: false` | Ignorar campos extra | Un precio enviado por el cliente se rechaza en lugar de ignorarse en silencio. |
+| Compra doble | Header opcional `Idempotency-Key` (UUID) en `POST /checkouts` | Bloquear solo en el cliente | Un reintento de red o un doble clic que el cliente no alcance a bloquear devuelve la misma orden (201, mismo `id`) sin reservar stock otra vez. "Mismo cuerpo" se compara por un hash del carrito normalizado (cantidades del mismo producto sumadas y ordenadas por `productId`) y el cupón; otro cuerpo con la misma clave es `IDEMPOTENCY_KEY_REUSED` (409). |
 
 ## Pendientes
 

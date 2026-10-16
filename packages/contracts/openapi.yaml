@@ -143,11 +143,20 @@ paths:
         aplica la cascada de descuentos (categoría → volumen → cupón → tope) y
         guarda la orden con su desglose en una sola transacción. Si algo falla,
         no se guarda nada y el stock no cambia.
+
+
+        Con `Idempotency-Key`, un reintento con la misma clave y el mismo cuerpo
+        devuelve la orden ya creada (201, mismo `id`) sin reservar stock otra vez.
+        La misma clave con otro cuerpo responde 409 `IDEMPOTENCY_KEY_REUSED`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         $ref: '#/components/requestBodies/CheckoutRequest'
       responses:
         '201':
-          description: Checkout guardado.
+          description: >
+            Checkout guardado. Si la clave de idempotencia ya se usó con el mismo
+            cuerpo, es la orden guardada en el primer intento.
           content:
             application/json:
               schema:
@@ -196,7 +205,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
-          $ref: '#/components/responses/InsufficientStock'
+          $ref: '#/components/responses/CheckoutConflict'
         '422':
           $ref: '#/components/responses/BusinessRuleViolation'
         '500':
@@ -205,6 +214,20 @@ paths:
           $ref: '#/components/responses/DatabaseUnavailable'
 
 components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >
+        UUID que identifica un intento de pago. El cliente lo genera una vez por
+        intento y lo reenvía en cada reintento de ese intento. Se compara sin
+        distinguir mayúsculas. Sin clave, cada petición crea una orden nueva.
+      schema:
+        type: string
+        format: uuid
+      example: 3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f
+
   schemas:
     Money:
       description: >
@@ -404,6 +427,7 @@ components:
         - INVALID_COUPON
         - COUPON_EXPIRED
         - INSUFFICIENT_STOCK
+        - IDEMPOTENCY_KEY_REUSED
         - DATA_INTEGRITY_VIOLATION
         - DATABASE_UNAVAILABLE
         - PERSISTENCE_ERROR
@@ -502,8 +526,8 @@ components:
     BadRequest:
       description: >
         `VALIDATION_ERROR` si el cuerpo no cumple el contrato (JSON corrupto, tipos
-        incorrectos, cantidad menor que 1, propiedades no permitidas como un precio).
-        `EMPTY_CART` si `items` está vacío.
+        incorrectos, cantidad menor que 1, propiedades no permitidas como un precio)
+        o si `Idempotency-Key` no es un UUID. `EMPTY_CART` si `items` está vacío.
       content:
         application/problem+json:
           schema:
@@ -533,6 +557,36 @@ components:
             productId: 6
             requested: 1
             available: 0
+
+    CheckoutConflict:
+      description: >
+        `INSUFFICIENT_STOCK` si no hay unidades suficientes (no se reservó nada).
+        `IDEMPOTENCY_KEY_REUSED` si la `Idempotency-Key` ya se usó con otro cuerpo
+        (no se creó otra orden ni se reservó stock).
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/InsufficientStockProblem'
+              - $ref: '#/components/schemas/Problem'
+          examples:
+            stockInsuficiente:
+              value:
+                type: about:blank
+                title: Stock insuficiente
+                status: 409
+                detail: No hay unidades suficientes del producto 6.
+                code: INSUFFICIENT_STOCK
+                productId: 6
+                requested: 1
+                available: 0
+            claveReutilizada:
+              value:
+                type: about:blank
+                title: Clave de idempotencia reutilizada
+                status: 409
+                detail: La clave de idempotencia ya se usó con otra solicitud.
+                code: IDEMPOTENCY_KEY_REUSED
 
     BusinessRuleViolation:
       description: >
