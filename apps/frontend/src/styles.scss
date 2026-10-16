@@ -16,6 +16,10 @@
   --color-disabled-text: #57534e;
   --color-error-bg: #fef2f2;
   --color-error-border: #b91c1c;
+  --color-error-text: #991b1b;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #b45309;
+  --color-success-text: #166534;
   --color-focus: #1d4ed8;
 
   --space-1: 0.25rem;
@@ -116,6 +120,16 @@ h3 {
 .notice--error {
   background: var(--color-error-bg);
   border-color: var(--color-error-border);
+}
+
+.notice--warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  border-left-width: 4px;
+}
+
+.notice > p:last-child {
+  margin-bottom: 0;
 }
 
 /* Oculta visualmente un texto sin quitárselo a los lectores de pantalla */

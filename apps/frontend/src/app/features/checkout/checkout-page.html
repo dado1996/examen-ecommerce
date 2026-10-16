@@ -42,20 +42,72 @@
     </table>
   </div>
 
-  <div class="coupon">
+  <form class="coupon" novalidate (submit)="applyDiscount($event)">
     <label class="coupon__label" for="coupon-code">Código de cupón <span class="coupon__optional">(opcional)</span></label>
-    <input
-      id="coupon-code"
-      class="coupon__input"
-      type="text"
-      maxlength="50"
-      autocomplete="off"
-      autocapitalize="characters"
-      spellcheck="false"
-      aria-describedby="coupon-hint"
-      [value]="cart.couponCode()"
-      (input)="onCouponInput($event)"
-    />
-    <p id="coupon-hint" class="coupon__hint">El cupón se valida al calcular los descuentos.</p>
+    <div class="coupon__row">
+      <input
+        id="coupon-code"
+        class="coupon__input"
+        type="text"
+        maxlength="50"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        [attr.aria-invalid]="couponError() ? 'true' : null"
+        [attr.aria-describedby]="couponError() ? 'coupon-hint coupon-error' : 'coupon-hint'"
+        [value]="cart.couponCode()"
+        (input)="onCouponInput($event)"
+      />
+      <button type="submit" class="button button--primary" [disabled]="loading()">
+        {{ loading() ? 'Calculando…' : 'Aplicar descuento' }}
+      </button>
+    </div>
+    <p id="coupon-hint" class="coupon__hint">
+      Calcula los descuentos de categoría, volumen y cupón. Sin cupón, calcula solo los demás.
+    </p>
+    @if (couponError(); as message) {
+      <p id="coupon-error" class="coupon__error">{{ message }}</p>
+    }
+    <p id="coupon-status" class="coupon__status" aria-live="polite">
+      @if (breakdown()?.couponCode; as code) {
+        Cupón {{ code }} aplicado.
+      }
+    </p>
+  </form>
+
+  @if (generalError(); as message) {
+    <div role="alert" class="notice notice--error">
+      <p>{{ message }}</p>
+    </div>
+  }
+
+  @if (breakdown(); as result) {
+    @if (result.capApplied) {
+      <div role="alert" class="notice notice--warning">
+        <p>
+          Alcanzaste el descuento máximo del {{ maxRate() }}. Tu descuento se limitó a
+          <strong>{{ formatMoney(result.discountTotal) }}</strong>.
+        </p>
+      </div>
+    }
+  }
+
+  <div aria-live="polite">
+    @if (breakdown(); as result) {
+      <section class="breakdown-panel" aria-labelledby="breakdown-title">
+        <h3 id="breakdown-title">Desglose de descuentos</h3>
+        @if (result.discounts.length === 0) {
+          <p class="breakdown-panel__empty">Ningún descuento aplica a este carrito.</p>
+        }
+        <dl class="breakdown">
+          @for (row of rows(); track row.label) {
+            <div [class]="'breakdown__row breakdown__row--' + row.kind">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          }
+        </dl>
+      </section>
+    }
   </div>
 </section>

@@ -5,12 +5,17 @@ import { of } from 'rxjs';
 
 import { routes } from './app.routes';
 import { CatalogApi } from './core/api/catalog-api';
+import { CheckoutApi } from './core/api/checkout-api';
 import { CartStore } from './features/cart/cart-store';
 
 describe('routes', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes), { provide: CatalogApi, useValue: { listProducts: () => of([]) } }],
+      providers: [
+        provideRouter(routes),
+        { provide: CatalogApi, useValue: { listProducts: () => of([]) } },
+        { provide: CheckoutApi, useValue: {} },
+      ],
     });
   });
 
