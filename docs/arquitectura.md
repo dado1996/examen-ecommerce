@@ -8,7 +8,7 @@
 |---|---|---|---|
 | Backend | Java 21 + Spring Boot 3.5 | NestJS, Quarkus | Stack de referencia en el dominio bancario; `BigDecimal` nativo para dinero; ecosistema maduro de pruebas (JUnit 5, Mockito, JaCoCo). |
 | Frontend | Angular 21 con TypeScript estricto | React, Angular 22 | Estado reactivo con Signals sin librerías extra. Angular 21 en lugar de 22: soporta Node 20.19+/22.12+, lo que evita fallas de instalación en equipos con Node 22 no actualizado. |
-| Tipado de extremo a extremo | Contrato OpenAPI en `packages/contracts` | Tipos duplicados a mano en front y back | Una sola fuente de verdad para los DTO; los tipos TypeScript se generan del contrato. _(pendiente: generación)_ |
+| Tipado de extremo a extremo | Contrato OpenAPI en `packages/contracts` | Tipos duplicados a mano en front y back | Una sola fuente de verdad para los DTO. El backend valida sus respuestas contra el contrato; en el frontend los tipos se escriben a mano según el contrato. _(pendiente: generarlos automáticamente)_ |
 | Persistencia de órdenes | SQLite con Spring JDBC | JSON en disco, memoria, JPA | Transaccional (ACID) y sin instalación para la demo local. JDBC en lugar de JPA: el modelo es pequeño y SQLite no tiene dialecto oficial en Hibernate. Esquema en `packages/schema` (ver sección 2). |
 | Dinero en SQLite | `TEXT` decimal exacto en tablas `STRICT` | `REAL`, `INTEGER` en centavos | SQLite no tiene `DECIMAL`; `REAL` es flotante y los centavos obligan a redondear montos intermedios. `TEXT` se lee sin pérdida con `BigDecimal`. |
 | Stock | En memoria (requisito HU3) | Base de datos | Lo exige el enunciado. Decremento atómico por producto (`ConcurrentHashMap.compute` en `InMemoryStockRepository`) para evitar sobreventa con checkouts concurrentes. |
@@ -45,7 +45,7 @@ users ─0..1──< checkouts >──┬── checkout_items >── products
 - `products.initial_stock` solo siembra el stock en memoria; el stock vivo no se persiste.
 - `checkouts.user_id` es opcional (invitado), porque el cliente solo envía `productId`, cantidad y cupón.
 
-Detalle, decisiones y pendientes de integración en [`packages/schema/README.md`](../packages/schema/README.md).
+Detalle, decisiones e integración con el backend en [`packages/schema/README.md`](../packages/schema/README.md).
 
 ### Frontend (`apps/frontend/src/app`)
 

@@ -3,7 +3,7 @@
 Contrato OpenAPI compartido entre `apps/backend` y `apps/frontend`.
 
 - **Fuente de verdad:** `openapi.yaml`. Cualquier cambio en la API empieza aquí.
-- **Frontend:** los tipos TypeScript se generan del contrato, para que front y back no se desalineen. _(pendiente: script de generación)_
+- **Frontend:** los tipos TypeScript (`core/models`) se escriben a mano según el contrato. _(pendiente: generarlos con un script, para que front y back no se desalineen)_
 - **Backend:** las pruebas de la capa `api` validan cada respuesta contra el contrato con `swagger-request-validator-mockmvc` (`ApiIntegrationTest` en `apps/backend`).
 
 Base: `http://localhost:8080/api/v1`.

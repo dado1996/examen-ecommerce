@@ -214,7 +214,7 @@ Si más adelante se adopta Flyway, `schema.sql` pasa a ser la migración `V1` y 
 
 Un monto NULL o que no es decimal se lee como `DataRetrievalFailureException` (ver `SqliteMoney`), no como `NumberFormatException`.
 
-**No hay fallback ante una base caída:** el arranque falla rápido y, en ejecución, cada petición responde 503 sin reintentar. Ver "Pendiente".
+**No hay fallback ante una base caída, por decisión:** el arranque falla rápido y, en ejecución, cada petición responde 503 sin reintentar. Para una orden financiera es preferible fallar a guardar a medias o con datos degradados.
 
 ### Pruebas
 
@@ -238,11 +238,11 @@ Además, sin Spring o con una base aislada:
 - `ApiExceptionHandlerTest`: cada error llega con su `status` y `code`, sin filtrar el mensaje interno;
 - datos corruptos al escribir: más de 2 decimales, descuento por encima del tope (y exactamente en el tope) y monto negativo.
 
-### Pendiente
+### Decisiones resueltas durante la integración
 
-- **Normalizar las categorías a Unicode NFC.** `'Tecnología'` con tilde precompuesta y con tilde combinada son cadenas distintas para SQLite. Corresponde a la lectura del catálogo, que aún no existe.
-- **Fallbacks que no existen.** No hay reintento ante `SQLITE_BUSY` (con un pool de 1 conexión es poco probable, pero se puede agregar `busy_timeout` a la URL), ni modo degradado si la base no abre al arrancar (hoy falla rápido, que es lo deseable para una orden financiera).
-- **Liberar stock si falla la persistencia.** El puerto de stock solo reserva; el caso de uso de checkout decidirá cómo compensar.
+- **Categorías en Unicode NFC.** `'Tecnología'` con tilde precompuesta y con tilde combinada son cadenas distintas para SQLite. `CategoryDiscount` normaliza a NFC al comparar la categoría del producto con `discounts.category.name` (prueba `laCategoriaSeComparaEnUnicodeNormalizado`).
+- **Stock devuelto si falla la persistencia.** `StockRepository.release` devuelve lo reservado, y `CheckoutService` lo llama si falla una reserva o el guardado (pruebas `siFallaElGuardadoDevuelveElStockYPropagaElError` y `devuelveElStockAunqueElGuardadoFalleConUnError`).
+- **Sin reintento ante `SQLITE_BUSY`.** Con un pool de 1 conexión no hay escritores concurrentes en el mismo proceso, así que no se agregó `busy_timeout`. Si hubiera más conexiones o procesos, sería el primer ajuste.
 
 ## Casos de borde que resuelve el dominio, no el esquema
 
@@ -251,6 +251,6 @@ Además, sin Spring o con una base aislada:
 | Carrito vacío | Dominio, que lo rechaza antes de guardar | `subtotal > 0` y `quantity > 0` |
 | Datos corruptos | Validación de entrada en la API | Tipos `STRICT`, formato decimal, FK y `CHECK` |
 | Cupón no registrado | Dominio, contra `discounts.coupon.code` | Solo se guarda el cupón aplicado |
-| Cupón expirado | **Pendiente:** `discounts.coupon` no tiene fecha de expiración | — |
+| Cupón expirado | Dominio, contra `discounts.coupon.expires-at` (`COUPON_EXPIRED`) | Solo se guarda el cupón aplicado |
 | Stock insuficiente | Adaptador de stock en memoria | El producto 6 del seed tiene `initial_stock = 0` para la demo |
 | Tope del 35% superado | Dominio | Paso `CAP`, `max_discount_rate` y el `CHECK` de tope |

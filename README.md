@@ -2,7 +2,7 @@
 
 MVP de checkout para un e-commerce: un backend que valida stock, calcula descuentos acumulativos en cascada con tope del 35% y persiste órdenes, y un frontend reactivo para gestionar el carrito y ver el desglose.
 
-> Estado: estructura inicial. Las secciones marcadas con _(pendiente)_ se completan a medida que avanza el desarrollo.
+> Estado: MVP funcional de punta a punta: catálogo, carrito, desglose de descuentos, pago y confirmación. Las decisiones, los trade-offs y los riesgos conocidos están en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ## Stack
 
@@ -100,9 +100,14 @@ Carga `schema.sql` y `seed.sql` en una base en memoria y verifica que los datos 
 |---|---|---|
 | `SERVER_PORT` | Puerto del backend | `8080` |
 | `APP_CORS_ALLOWED_ORIGINS` | Orígenes permitidos para CORS | `http://localhost:4200` |
-| `discounts.*` | Porcentajes, umbral y tope de las reglas de descuento | Ver `application.yml` |
+| `APP_DB_PATH` | Archivo de la base SQLite | `./data/checkout.db` |
+| `discounts.*` | Porcentajes, umbral, cupón y tope de las reglas de descuento | Ver `application.yml` |
+| `discounts.coupon.expires-at` | Instante (ISO-8601, exclusivo) desde el cual el cupón responde `COUPON_EXPIRED` | `2027-01-01T00:00:00Z` |
+| `app.limits.max-body-size` | Tamaño máximo del cuerpo en `/api/**` (413 `PAYLOAD_TOO_LARGE`) | `16KB` |
+| `app.limits.checkout-rate.*` | Peticiones por IP a `/checkouts` y `/checkouts/preview` (429 `TOO_MANY_REQUESTS`) | 60 por minuto |
+| `app.limits.coupon-failures.*` | Cupones rechazados por IP antes de bloquearla, contra la enumeración de cupones | 10 cada 15 minutos |
 
-_(pendiente: completar a medida que se agreguen variables)_
+Si el esquema cambia (columnas nuevas), hay que borrar el archivo de `APP_DB_PATH` antes de arrancar: `CREATE TABLE IF NOT EXISTS` no altera una tabla existente.
 
 ## Endpoints
 
@@ -112,10 +117,9 @@ Base `http://localhost:8080/api/v1`. El contrato completo está en [`packages/co
 |---|---|---|
 | `GET` | `/products` | Lista los productos en stock |
 | `POST` | `/checkouts/preview` | Calcula el desglose de descuentos sin confirmar |
-| `POST` | `/checkouts` | Confirma la compra y guarda el checkout |
-
-_(pendiente: implementación en el backend)_
+| `POST` | `/checkouts` | Confirma la compra y guarda el checkout (header opcional `Idempotency-Key`) |
+| `GET` | `/health` (fuera de `/api/v1`) | Estado del servicio: `UP` o `DOWN`, sin detalles |
 
 ## Supuestos
 
-_(pendiente: se documentan en `docs/arquitectura.md`)_
+Los supuestos y hallazgos (orden de la cascada, umbral de volumen, redondeo, tope inalcanzable con los valores actuales) están en la [sección 7 de `docs/arquitectura.md`](docs/arquitectura.md#7-supuestos-y-hallazgos).
