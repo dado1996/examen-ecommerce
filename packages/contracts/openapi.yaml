@@ -24,8 +24,47 @@ tags:
     description: Productos disponibles para la compra (HU1)
   - name: Checkout
     description: Cálculo del desglose de descuentos y confirmación de la orden (HU2, HU3, HU4)
+  - name: Operación
+    description: Estado del servicio para monitoreo
 
 paths:
+  /health:
+    servers:
+      - url: http://localhost:8080
+        description: Fuera de /api/v1, para monitoreo
+    get:
+      tags: [Operación]
+      operationId: getHealth
+      summary: Estado del servicio
+      description: >
+        `UP` si el servicio y su base están operativos. No incluye detalles internos
+        (rutas, versiones ni componentes).
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: UP
+            # Tipo por defecto de Actuator si el cliente no pide application/json
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: El servicio o una de sus dependencias, como la base, no está disponible.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: DOWN
+            # Tipo por defecto de Actuator si el cliente no pide application/json
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
   /products:
     get:
       tags: [Catálogo]
@@ -186,6 +225,14 @@ components:
       type: string
       pattern: '^(0(\.\d+)?|1(\.0+)?)$'
       example: '0.15'
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [UP, DOWN, OUT_OF_SERVICE, UNKNOWN]
 
     Product:
       type: object

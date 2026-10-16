@@ -51,8 +51,14 @@ discounts:
     expires-at: "2027-01-01T00:00:00Z"
   max-total-rate: "0.35"
 
+# GET /health: estado del servicio para monitoreo. UP (200) o DOWN (503) según la base y el disco.
+# Sin detalles en la respuesta, para no exponer rutas ni versiones.
 management:
   endpoints:
     web:
+      base-path: /
       exposure:
         include: health
+  endpoint:
+    health:
+      show-details: never
