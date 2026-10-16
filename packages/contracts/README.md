@@ -4,7 +4,7 @@ Contrato OpenAPI compartido entre `apps/backend` y `apps/frontend`.
 
 - **Fuente de verdad:** `openapi.yaml`. Cualquier cambio en la API empieza aquí.
 - **Frontend:** los tipos TypeScript se generan del contrato, para que front y back no se desalineen. _(pendiente: script de generación)_
-- **Backend:** los DTO se validan contra el contrato con pruebas de la capa `api`. _(pendiente)_
+- **Backend:** las pruebas de la capa `api` validan cada respuesta contra el contrato con `swagger-request-validator-mockmvc` (`ApiIntegrationTest` en `apps/backend`).
 
 Base: `http://localhost:8080/api/v1`.
 
@@ -15,6 +15,7 @@ Base: `http://localhost:8080/api/v1`.
 | `GET` | `/products` | `listProducts` | `200 Product[]` | Lista los productos activos con stock disponible mayor que cero. |
 | `POST` | `/checkouts/preview` | `previewCheckout` | `200 CheckoutBreakdown` | Calcula el desglose sin guardar ni descontar stock. |
 | `POST` | `/checkouts` | `createCheckout` | `201 Checkout` | Reserva el stock, aplica la cascada y guarda la orden en una sola transacción. |
+| `GET` | `/health` (fuera de `/api/v1`) | `getHealth` | `200 {"status": "UP"}` | Estado del servicio para monitoreo. Responde `503` con `DOWN` si la base no está disponible. Sin detalles internos. |
 
 ### `GET /products`
 
@@ -76,7 +77,7 @@ La respuesta es el desglose. El checkout confirmado agrega `id` y `createdAt`:
 
 | Esquema | Formato | Uso |
 |---|---|---|
-| `Money` | `^\d+\.\d{2}$` | Precios y totales finales, redondeados `HALF_EVEN`. |
+| `Money` | `^\d+\.\d{2}$` | Precios y totales finales, redondeados `HALF_EVEN`. Excepción: si se aplicó el tope, `discountTotal` se redondea hacia abajo para que nunca lo supere (subtotal 100.10 con tope 35% → `35.03`, no `35.04`). |
 | `Decimal` | `^\d+(\.\d+)?$` | Montos intermedios de la cascada, sin redondear. El frontend los redondea solo para mostrarlos. |
 | `Rate` | `0` a `1` | Tasas (`"0.15"` = 15%). |
 
@@ -92,7 +93,7 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 | `EMPTY_CART` | 400 | `items` vacío. | — |
 | `PRODUCT_NOT_FOUND` | 422 | El producto no existe o está inactivo. | `productId` |
 | `INVALID_COUPON` | 422 | El cupón no está registrado. | — |
-| `COUPON_EXPIRED` | 422 | El cupón está vencido. _(pendiente: falta `discounts.coupon.expires-at` en la configuración)_ | — |
+| `COUPON_EXPIRED` | 422 | El cupón está vencido: el instante actual es igual o posterior a `discounts.coupon.expires-at`. | — |
 | `INSUFFICIENT_STOCK` | 409 | No alcanzan las unidades; no se reservó nada. | `productId`, `requested`, `available` |
 | `DATA_INTEGRITY_VIOLATION` | 422 | La base rechazó la orden por inconsistente; no se guardó. | — |
 | `DATABASE_UNAVAILABLE` | 503 | La base no está disponible por ahora; se puede reintentar. | — |
@@ -111,7 +112,5 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 
 ## Pendientes
 
-- Implementar los controladores, el motor de descuentos y los códigos `VALIDATION_ERROR`, `EMPTY_CART`, `PRODUCT_NOT_FOUND`, `INVALID_COUPON` y `COUPON_EXPIRED` en el backend. Hoy solo existen los cuatro códigos de persistencia y stock.
-- Agregar `discounts.coupon.expires-at` a la configuración para poder detectar un cupón expirado.
 - Generar los tipos TypeScript del contrato.
 - Validar el contrato con un linter (p. ej. `@redocly/cli lint`). Hoy se verificó con un script local que resuelve las `$ref` y valida los ejemplos contra sus esquemas.

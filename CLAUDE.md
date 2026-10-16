@@ -11,6 +11,7 @@ Monorepo de un checkout con motor de descuentos acumulativos. Backend Spring Boo
 ## Reglas técnicas
 
 - **Dinero:** `BigDecimal` en Java, nunca `double`/`float`. Redondeo `HALF_EVEN` a 2 decimales solo en los totales finales.
+  Excepción: si se aplica el tope, el descuento total se redondea `DOWN` para que nunca supere el 35% (100.10 → 35.03).
 - **Precios:** el backend siempre toma el precio del catálogo propio. El cliente solo envía `productId`, cantidad y cupón.
 - **Dominio aislado:** nada en `..domain..` importa Spring, Jakarta ni otras capas. `ArchitectureTest` lo verifica.
 - **Tipado estricto:** prohibido `any` en TypeScript. Si es inevitable, se justifica con un comentario.

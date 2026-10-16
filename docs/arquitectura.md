@@ -11,7 +11,7 @@
 | Tipado de extremo a extremo | Contrato OpenAPI en `packages/contracts` | Tipos duplicados a mano en front y back | Una sola fuente de verdad para los DTO; los tipos TypeScript se generan del contrato. _(pendiente: generación)_ |
 | Persistencia de órdenes | SQLite con Spring JDBC | JSON en disco, memoria, JPA | Transaccional (ACID) y sin instalación para la demo local. JDBC en lugar de JPA: el modelo es pequeño y SQLite no tiene dialecto oficial en Hibernate. Esquema en `packages/schema` (ver sección 2). |
 | Dinero en SQLite | `TEXT` decimal exacto en tablas `STRICT` | `REAL`, `INTEGER` en centavos | SQLite no tiene `DECIMAL`; `REAL` es flotante y los centavos obligan a redondear montos intermedios. `TEXT` se lee sin pérdida con `BigDecimal`. |
-| Stock | En memoria (requisito HU3) | Base de datos | Lo exige el enunciado. Decremento atómico para evitar sobreventa con checkouts concurrentes. _(pendiente)_ |
+| Stock | En memoria (requisito HU3) | Base de datos | Lo exige el enunciado. Decremento atómico por producto (`ConcurrentHashMap.compute` en `InMemoryStockRepository`) para evitar sobreventa con checkouts concurrentes. |
 
 ## 2. Diseño de carpetas
 
@@ -60,7 +60,11 @@ shared/     # Componentes de UI reutilizables
 
 ## 3. Aislamiento del motor de descuentos
 
-_(pendiente)_ Cómo se separan las reglas matemáticas de la persistencia y de los controladores.
+- **Las reglas son dominio puro.** `domain/discount` no importa Spring, Jakarta ni otras capas (`ArchitectureTest` lo verifica). Cada regla (`CategoryDiscount`, `VolumeDiscount`, `CouponDiscount`) implementa `DiscountStrategy` y solo ve un `DiscountContext`: líneas con precio del catálogo, subtotal original, monto restante y cupón enviado.
+- **El motor encadena y topa.** `DiscountEngine` ordena las reglas por `DiscountRule.step` (no por el orden de inyección), aplica la cascada multiplicativa, trunca en `max-total-rate` registrando el paso `CAP` y redondea solo los totales. Devuelve un `DiscountResult` sin saber de HTTP ni de SQL.
+- **La configuración entra por una fábrica.** `DiscountEngineFactory` traduce `discounts.*` (`DiscountProperties`) a las reglas; es el único punto que conoce a la vez Spring y el dominio. El reloj (`Clock`) se inyecta para probar el vencimiento del cupón.
+- **Los casos de uso orquestan.** `CheckoutService` arma el carrito, toma los precios de `ProductCatalog`, llama al motor y solo después reserva stock y guarda con `OrderRepository`. Los controladores de `api` solo traducen DTO ↔ comandos y resultados.
+- Consecuencia: el motor se prueba sin Spring ni base (`DiscountEngineTest`) y cambiar un porcentaje es cambiar `application.yml`.
 
 ## 4. Patrones de diseño
 
@@ -70,7 +74,7 @@ _(pendiente)_ Cómo se separan las reglas matemáticas de la persistencia y de l
 | Factory | `infrastructure/config` | Construye las reglas a partir de la configuración, en el orden de precedencia. |
 | Observer | Frontend (Signals) | La vista reacciona a los cambios del carrito sin sincronización manual. |
 
-_(pendiente: confirmar y documentar con referencias al código)_
+Referencias en el backend: Strategy en `DiscountStrategy` y sus tres implementaciones; Factory en `DiscountEngineFactory.create(DiscountProperties, Clock)`. Observer queda por documentar con el frontend.
 
 ## 5. SOLID
 
@@ -85,20 +89,22 @@ Contrato en [`packages/contracts/openapi.yaml`](../packages/contracts/openapi.ya
 | `GET` | `/api/v1/products` | Productos activos con stock disponible (vivo, no el inicial). |
 | `POST` | `/api/v1/checkouts/preview` | Desglose de descuentos sin guardar ni descontar stock. |
 | `POST` | `/api/v1/checkouts` | Reserva el stock, aplica la cascada y guarda la orden en una sola transacción. |
+| `GET` | `/health` | Estado del servicio: `UP` (200) o `DOWN` (503). Es el health de Actuator publicado en la raíz, así que incluye la base de datos; no expone detalles. |
 
 - **Request cerrado:** el cliente solo envía `productId`, `quantity` y `couponCode`. Cualquier otra propiedad, como un precio, se rechaza con `VALIDATION_ERROR`.
 - **Dinero como string decimal** en el JSON, para que ningún extremo lo lea como flotante.
 - **La respuesta es el desglose completo** (líneas, pasos de la cascada, totales y `capApplied`). El frontend no repite el cálculo.
 - **Errores:** Problem Details con `code` estable: `VALIDATION_ERROR`, `EMPTY_CART`, `PRODUCT_NOT_FOUND`, `INVALID_COUPON`, `COUPON_EXPIRED`, `INSUFFICIENT_STOCK`, `DATA_INTEGRITY_VIOLATION`, `DATABASE_UNAVAILABLE` y `PERSISTENCE_ERROR`.
 
-_(pendiente: implementar los controladores, el motor y los cinco códigos de validación y negocio en el backend)_
+Implementación: `ProductController` y `CheckoutController` en `api`, con DTO en `api/dto`. El request se cierra con `spring.jackson.deserialization.fail-on-unknown-properties` y sin coerción de escalares (`"2"` o `1.5` como cantidad se rechazan). Las pruebas de `api` validan cada respuesta contra `openapi.yaml` con `swagger-request-validator-mockmvc`.
 
 ## 7. Supuestos y hallazgos
 
 - **Orden de precedencia:** categoría → volumen → cupón → tope, en cascada multiplicativa sobre el subtotal original.
 - **Umbral de volumen:** "supera los $100 USD" se interpreta como estrictamente mayor que 100, evaluado sobre el subtotal después del descuento de categoría.
 - **Dinero:** `BigDecimal`, redondeo `HALF_EVEN` a 2 decimales solo en los totales finales.
-- **Hallazgo — el cupón expirado no tiene fecha.** El caso de borde "cupón expirado" es obligatorio, pero `discounts.coupon` solo define `code` y `rate`. _(pendiente: agregar `discounts.coupon.expires-at` a la configuración, no una tabla de cupones, para mantener los valores en `discounts.*`)_
+- **El tope prevalece sobre `HALF_EVEN`.** Cuando se aplica el tope, el descuento total se redondea hacia abajo (`RoundingMode.DOWN`): con `HALF_EVEN` podía quedar medio centavo por encima. Ejemplo: subtotal 100.10, tope 35% = 35.035 → `HALF_EVEN` daría 35.04 (> 35%); se entrega **35.03** y el total es 65.07. Sin tope, se sigue usando `HALF_EVEN`.
+- **Hallazgo — el cupón expirado no tenía fecha.** El caso de borde "cupón expirado" es obligatorio, pero `discounts.coupon` solo definía `code` y `rate`. Se agregó `discounts.coupon.expires-at` (instante ISO-8601, exclusivo: desde ese instante el cupón responde `COUPON_EXPIRED`) en lugar de una tabla de cupones, para mantener los valores en `discounts.*`. Hoy vale `2027-01-01T00:00:00Z`, es decir, todo 2026 en UTC.
 - **Checkout sin usuario autenticado.** No hay autenticación en el alcance; `checkouts.user_id` es opcional para no exigirle al cliente más que `productId`, cantidad y cupón.
 - **Hallazgo — el tope del 35% no se alcanza con los valores actuales.** El descuento máximo posible es un carrito 100% de Tecnología, sobre $100 y con cupón: 1 − (0,90 × 0,95 × 0,85) = **27,325%**. Por eso las reglas son parametrizables: el tope actúa como protección ante cambios futuros de porcentajes, y la alerta de HU4 se demuestra con una configuración alternativa. _(pendiente: definir el perfil de demo)_
 

@@ -207,7 +207,9 @@ paths:
 components:
   schemas:
     Money:
-      description: Monto en USD con exactamente 2 decimales. Es un total final, redondeado HALF_EVEN.
+      description: >
+        Monto en USD con exactamente 2 decimales. Es un total final, redondeado HALF_EVEN;
+        si se aplicó el tope, `discountTotal` se redondea hacia abajo para no superarlo.
       type: string
       pattern: '^\d+\.\d{2}$'
       example: '1200.00'
@@ -346,7 +348,9 @@ components:
     CheckoutBreakdown:
       description: >
         Desglose del carrito. Se cumple que `total = subtotal - discountTotal` y que
-        `discountTotal <= subtotal × maxDiscountRate`.
+        `discountTotal <= subtotal × maxDiscountRate`. Para garantizarlo, cuando se aplica
+        el tope `discountTotal` se redondea hacia abajo (subtotal 100.10, tope 0.35 →
+        35.03, no 35.04); en los demás casos se redondea HALF_EVEN.
       type: object
       required: [couponCode, lines, discounts, subtotal, discountTotal, total, maxDiscountRate, capApplied]
       properties:
