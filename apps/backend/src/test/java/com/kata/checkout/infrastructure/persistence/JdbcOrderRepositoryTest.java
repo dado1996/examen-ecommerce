@@ -7,8 +7,10 @@ import com.kata.checkout.domain.model.AppliedDiscount;
 import com.kata.checkout.domain.model.DiscountRule;
 import com.kata.checkout.domain.model.Order;
 import com.kata.checkout.domain.model.OrderLine;
+import com.kata.checkout.domain.model.SavedOrder;
 import com.kata.checkout.domain.port.OrderRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +47,7 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
 
     @Test
     void guardaCabeceraLineasYDescuentosEnUnaSolaOperacion() {
-        long id = orders.save(ordenConCupon());
+        long id = orders.save(ordenConCupon()).id();
 
         Map<String, Object> cabecera = jdbc.queryForMap("SELECT * FROM checkouts WHERE id = ?", id);
         assertThat(cabecera)
@@ -64,7 +66,7 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
 
     @Test
     void guardaElDineroComoTextoDecimalExactoSinRedondearLosPasosIntermedios() {
-        long id = orders.save(ordenConCupon());
+        long id = orders.save(ordenConCupon()).id();
 
         assertThat(jdbc.queryForObject(
                 "SELECT typeof(base_amount) || ' ' || base_amount || ' ' || amount "
@@ -78,7 +80,7 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
     @Test
     void leeElCheckoutGuardadoConLosMismosMontosYEscalas() {
         Order original = ordenConCupon();
-        long id = orders.save(original);
+        long id = orders.save(original).id();
 
         assertThat(orders.findById(id)).contains(original);
     }
@@ -90,7 +92,7 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
                 List.of(),
                 new BigDecimal("9.00"), new BigDecimal("0.00"), new BigDecimal("9.00"), new BigDecimal("0.35"));
 
-        long id = orders.save(invitado);
+        long id = orders.save(invitado).id();
 
         assertThat(orders.findById(id)).contains(invitado);
         assertThat(jdbc.queryForObject("SELECT user_id IS NULL FROM checkouts WHERE id = ?", Integer.class, id))
@@ -111,11 +113,23 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
                                 new BigDecimal("40.500000"), new BigDecimal("5.500000"))),
                 new BigDecimal("100.00"), new BigDecimal("35.00"), new BigDecimal("65.00"), new BigDecimal("0.35"));
 
-        long id = orders.save(conTope);
+        long id = orders.save(conTope).id();
 
         assertThat(jdbc.queryForObject("SELECT cap_applied FROM checkout_summary WHERE id = ?", Integer.class, id))
                 .isEqualTo(1);
         assertThat(orders.findById(id)).hasValueSatisfying(o -> assertThat(o.capApplied()).isTrue());
+    }
+
+    @Test
+    void devuelveLaFechaDeCreacionQueAsignoLaBase() {
+        Instant antes = Instant.now().minusSeconds(1);
+
+        SavedOrder guardada = orders.save(ordenConCupon());
+
+        assertThat(guardada.createdAt()).isBetween(antes, Instant.now().plusSeconds(1));
+        assertThat(Instant.parse(jdbc.queryForObject(
+                "SELECT created_at FROM checkouts WHERE id = ?", String.class, guardada.id())))
+                .isEqualTo(guardada.createdAt());
     }
 
     @Test
@@ -195,7 +209,7 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
                 List.of(new OrderLine(4, 1, new BigDecimal("100.00"), "Hogar")), List.of(),
                 new BigDecimal("100.00"), new BigDecimal("35.00"), new BigDecimal("65.00"), new BigDecimal("0.35"));
 
-        assertThat(orders.findById(orders.save(enElTope))).contains(enElTope);
+        assertThat(orders.findById(orders.save(enElTope).id())).contains(enElTope);
     }
 
     @Test
@@ -220,7 +234,7 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
                 new BigDecimal("12345678901234567.89"), new BigDecimal("0.00"),
                 new BigDecimal("12345678901234567.89"), new BigDecimal("0.35"));
 
-        long id = orders.save(montosExtremos);
+        long id = orders.save(montosExtremos).id();
 
         assertThat(orders.findById(id)).contains(montosExtremos);
         assertThat(jdbc.queryForObject("SELECT subtotal FROM checkouts WHERE id = ?", String.class, id))

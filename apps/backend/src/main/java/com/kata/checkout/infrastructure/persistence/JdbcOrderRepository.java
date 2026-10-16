@@ -4,10 +4,12 @@ import com.kata.checkout.domain.model.AppliedDiscount;
 import com.kata.checkout.domain.model.DiscountRule;
 import com.kata.checkout.domain.model.Order;
 import com.kata.checkout.domain.model.OrderLine;
+import com.kata.checkout.domain.model.SavedOrder;
 import com.kata.checkout.domain.port.OrderRepository;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,14 +31,15 @@ public class JdbcOrderRepository implements OrderRepository {
     /** Cabecera, líneas y descuentos en una sola transacción: si algo falla, no queda una orden a medias. */
     @Override
     @Transactional
-    public long save(Order order) {
-        Long id = jdbc.queryForObject("""
+    public SavedOrder save(Order order) {
+        SavedOrder saved = jdbc.queryForObject("""
                 INSERT INTO checkouts (user_id, coupon_code, subtotal, discount_total, total, max_discount_rate)
                 VALUES (?, ?, ?, ?, ?, ?)
-                RETURNING id""",
-                Long.class,
+                RETURNING id, created_at""",
+                (rs, n) -> new SavedOrder(rs.getLong("id"), Instant.parse(rs.getString("created_at"))),
                 order.userId(), order.couponCode(), text(order.subtotal()), text(order.discountTotal()),
                 text(order.total()), text(order.maxDiscountRate()));
+        long id = saved.id();
 
         jdbc.batchUpdate("""
                 INSERT INTO checkout_items (checkout_id, product_id, quantity, unit_price, category, line_subtotal)
@@ -53,7 +56,7 @@ public class JdbcOrderRepository implements OrderRepository {
                         .map(d -> new Object[] {id, d.rule().step(), d.rule().name(), text(d.rate()), d.reference(),
                                 text(d.baseAmount()), text(d.amount())})
                         .toList());
-        return id;
+        return saved;
     }
 
     @Override

@@ -62,6 +62,24 @@ class InMemoryStockRepositoryTest {
     }
 
     @Test
+    void liberarDevuelveLasUnidadesReservadasAlStock() {
+        InMemoryStockRepository stock = new InMemoryStockRepository(Map.of(1L, 5));
+        stock.reserve(1, 3);
+
+        stock.release(1, 3);
+
+        assertThat(stock.available(1)).isEqualTo(5);
+    }
+
+    @Test
+    void rechazaLiberarUnaCantidadNoPositiva() {
+        InMemoryStockRepository stock = new InMemoryStockRepository(Map.of(1L, 5));
+
+        assertThatThrownBy(() -> stock.release(1, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(stock.available(1)).isEqualTo(5);
+    }
+
+    @Test
     void rechazaSembrarUnStockNegativo() {
         assertThatThrownBy(() -> new InMemoryStockRepository(Map.of(1L, -1)))
                 .isInstanceOf(IllegalArgumentException.class);

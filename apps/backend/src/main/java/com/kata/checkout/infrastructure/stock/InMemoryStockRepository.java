@@ -40,4 +40,12 @@ public class InMemoryStockRepository implements StockRepository {
             return available - quantity;
         });
     }
+
+    @Override
+    public void release(long productId, int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor que cero: " + quantity);
+        }
+        stock.merge(productId, quantity, Integer::sum);
+    }
 }
