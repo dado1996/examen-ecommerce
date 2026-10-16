@@ -9,7 +9,8 @@
 | Backend | Java 21 + Spring Boot 3.5 | NestJS, Quarkus | Stack de referencia en el dominio bancario; `BigDecimal` nativo para dinero; ecosistema maduro de pruebas (JUnit 5, Mockito, JaCoCo). |
 | Frontend | Angular 21 con TypeScript estricto | React, Angular 22 | Estado reactivo con Signals sin librerías extra. Angular 21 en lugar de 22: soporta Node 20.19+/22.12+, lo que evita fallas de instalación en equipos con Node 22 no actualizado. |
 | Tipado de extremo a extremo | Contrato OpenAPI en `packages/contracts` | Tipos duplicados a mano en front y back | Una sola fuente de verdad para los DTO; los tipos TypeScript se generan del contrato. _(pendiente: generación)_ |
-| Persistencia de órdenes | SQLite con Spring JDBC | JSON en disco, memoria, JPA | Transaccional (ACID) y sin instalación para la demo local. JDBC en lugar de JPA: el modelo es pequeño y SQLite no tiene dialecto oficial en Hibernate. |
+| Persistencia de órdenes | SQLite con Spring JDBC | JSON en disco, memoria, JPA | Transaccional (ACID) y sin instalación para la demo local. JDBC en lugar de JPA: el modelo es pequeño y SQLite no tiene dialecto oficial en Hibernate. Esquema en `packages/schema` (ver sección 2). |
+| Dinero en SQLite | `TEXT` decimal exacto en tablas `STRICT` | `REAL`, `INTEGER` en centavos | SQLite no tiene `DECIMAL`; `REAL` es flotante y los centavos obligan a redondear montos intermedios. `TEXT` se lee sin pérdida con `BigDecimal`. |
 | Stock | En memoria (requisito HU3) | Base de datos | Lo exige el enunciado. Decremento atómico para evitar sobreventa con checkouts concurrentes. _(pendiente)_ |
 
 ## 2. Diseño de carpetas
@@ -31,6 +32,20 @@ com.kata.checkout
 ```
 
 **Regla de dependencias:** `api → application → domain ← infrastructure`. El dominio no conoce a nadie.
+
+### Base de datos (`packages/schema`)
+
+```
+users ─0..1──< checkouts >──┬── checkout_items >── products
+                            └── checkout_discounts
+```
+
+- `checkout_items` es la pivote checkout × producto, con una copia del precio y la categoría del momento.
+- `checkout_discounts` guarda un registro por paso de la cascada (CATEGORY → VOLUME → COUPON → CAP), con la tasa aplicada y los montos sin redondear.
+- `products.initial_stock` solo siembra el stock en memoria; el stock vivo no se persiste.
+- `checkouts.user_id` es opcional (invitado), porque el cliente solo envía `productId`, cantidad y cupón.
+
+Detalle, decisiones y pendientes de integración en [`packages/schema/README.md`](../packages/schema/README.md).
 
 ### Frontend (`apps/frontend/src/app`)
 
@@ -70,6 +85,8 @@ _(pendiente: endpoints, contratos y códigos de error)_
 - **Orden de precedencia:** categoría → volumen → cupón → tope, en cascada multiplicativa sobre el subtotal original.
 - **Umbral de volumen:** "supera los $100 USD" se interpreta como estrictamente mayor que 100, evaluado sobre el subtotal después del descuento de categoría.
 - **Dinero:** `BigDecimal`, redondeo `HALF_EVEN` a 2 decimales solo en los totales finales.
+- **Hallazgo — el cupón expirado no tiene fecha.** El caso de borde "cupón expirado" es obligatorio, pero `discounts.coupon` solo define `code` y `rate`. _(pendiente: agregar `discounts.coupon.expires-at` a la configuración, no una tabla de cupones, para mantener los valores en `discounts.*`)_
+- **Checkout sin usuario autenticado.** No hay autenticación en el alcance; `checkouts.user_id` es opcional para no exigirle al cliente más que `productId`, cantidad y cupón.
 - **Hallazgo — el tope del 35% no se alcanza con los valores actuales.** El descuento máximo posible es un carrito 100% de Tecnología, sobre $100 y con cupón: 1 − (0,90 × 0,95 × 0,85) = **27,325%**. Por eso las reglas son parametrizables: el tope actúa como protección ante cambios futuros de porcentajes, y la alerta de HU4 se demuestra con una configuración alternativa. _(pendiente: definir el perfil de demo)_
 
 ## 8. Trade-offs asumidos

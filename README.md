@@ -23,7 +23,8 @@ examen-ecommerce/
 │   ├── backend/        # API REST Spring Boot (dominio aislado del framework)
 │   └── frontend/       # Aplicación Angular
 ├── packages/
-│   └── contracts/      # Contrato OpenAPI compartido
+│   ├── contracts/      # Contrato OpenAPI compartido
+│   └── schema/         # Esquema SQLite, datos de demo y su verificación
 ├── docs/
 │   ├── arquitectura.md
 │   └── ia.md
@@ -78,6 +79,14 @@ npm run test:coverage
 ```
 
 El reporte queda en `apps/frontend/coverage/`.
+
+### Esquema de base de datos
+
+```bash
+packages/schema/scripts/verify.sh
+```
+
+Carga `schema.sql` y `seed.sql` en una base en memoria y verifica que los datos corruptos se rechacen. Requiere `sqlite3` 3.37+.
 
 ## Configuración
 
