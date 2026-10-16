@@ -123,6 +123,49 @@ describe('CartStore', () => {
     expect(cart.subtotal()).toBe('2000.00');
   });
 
+  it('expone cada producto elegido con su cantidad y el total de la línea', () => {
+    cart.setQuantity(lampara, 3);
+    cart.setQuantity(laptop, 2);
+
+    expect(cart.items()).toEqual([
+      { product: lampara, quantity: 3, lineTotal: '120.00' },
+      { product: laptop, quantity: 2, lineTotal: '2400.00' },
+    ]);
+  });
+
+  it('empieza sin cupón', () => {
+    expect(cart.couponCode()).toBe('');
+    expect(cart.normalizedCoupon()).toBeNull();
+  });
+
+  it('guarda el cupón escrito y lo normaliza quitando espacios al inicio y al final', () => {
+    cart.setCouponCode('  welcome2026 ');
+
+    expect(cart.couponCode()).toBe('  welcome2026 ');
+    expect(cart.normalizedCoupon()).toBe('welcome2026');
+  });
+
+  it('un cupón en blanco equivale a no enviar cupón', () => {
+    cart.setCouponCode('   ');
+
+    expect(cart.normalizedCoupon()).toBeNull();
+  });
+
+  it('recorta un cupón más largo que el máximo del contrato', () => {
+    cart.setCouponCode('X'.repeat(80));
+
+    expect(cart.couponCode()).toHaveLength(50);
+  });
+
+  it('vacía el carrito y el cupón', () => {
+    cart.setQuantity(laptop, 1);
+    cart.setCouponCode('WELCOME2026');
+    cart.clear();
+
+    expect(cart.isEmpty()).toBe(true);
+    expect(cart.couponCode()).toBe('');
+  });
+
   it('vacía el carrito', () => {
     cart.setQuantity(laptop, 1);
     cart.clear();

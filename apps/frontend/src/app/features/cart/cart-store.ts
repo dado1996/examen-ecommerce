@@ -14,6 +14,14 @@ interface Selection {
   readonly quantity: number;
 }
 
+/** Producto elegido con su cantidad y el total de la línea antes de descuentos ("269.70"). */
+export interface CartItem extends Selection {
+  readonly lineTotal: string;
+}
+
+/** Largo máximo de `couponCode` en el contrato (CheckoutRequest). */
+const COUPON_MAX_LENGTH = 50;
+
 /**
  * Estado del carrito con Signals. Guarda la cantidad elegida de cada producto y el producto
  * mismo para mostrar el subtotal. Los descuentos y el total siempre los calcula el backend.
@@ -21,7 +29,20 @@ interface Selection {
 @Injectable({ providedIn: 'root' })
 export class CartStore {
   private readonly selections = signal<ReadonlyMap<number, Selection>>(new Map());
+  private readonly coupon = signal('');
 
+  /** Cupón tal como lo escribió el usuario. */
+  readonly couponCode = this.coupon.asReadonly();
+  /** Cupón listo para enviar: sin espacios al inicio ni al final, o `null` si está en blanco. */
+  readonly normalizedCoupon = computed(() => this.coupon().trim() || null);
+
+  readonly items = computed<readonly CartItem[]>(() =>
+    [...this.selections().values()].map(({ product, quantity }) => ({
+      product,
+      quantity,
+      lineTotal: centsToAmount(lineCents(product.unitPrice, quantity)),
+    })),
+  );
   readonly lines = computed<readonly CartLine[]>(() =>
     [...this.selections().values()].map(({ product, quantity }) => ({ productId: product.id, quantity })),
   );
@@ -95,7 +116,12 @@ export class CartStore {
     });
   }
 
+  setCouponCode(code: string): void {
+    this.coupon.set(code.slice(0, COUPON_MAX_LENGTH));
+  }
+
   clear(): void {
     this.selections.set(new Map());
+    this.coupon.set('');
   }
 }
