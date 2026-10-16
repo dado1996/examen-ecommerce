@@ -28,4 +28,9 @@ components:
           type: string
         code:
           type: string
-          description: Código de negocio estable para que el frontend muestre el mensaje adecuado
+          description: >
+            Código de negocio estable para que el frontend muestre el mensaje adecuado.
+            Códigos actuales: INSUFFICIENT_STOCK (409, con productId, requested y available),
+            DATA_INTEGRITY_VIOLATION (422), DATABASE_UNAVAILABLE (503, reintentable) y
+            PERSISTENCE_ERROR (500). Ninguno incluye el mensaje de la base, el SQL ni la traza.
+          example: INSUFFICIENT_STOCK
