@@ -7,6 +7,14 @@ spring:
   mvc:
     problemdetails:
       enabled: true # Errores en formato RFC 9457, sin trazas internas
+  jackson:
+    # Request cerrado (additionalProperties: false en el contrato): un precio enviado por el
+    # cliente se rechaza en lugar de ignorarse. Tampoco se aceptan "2" ni 1.5 como cantidad.
+    deserialization:
+      fail-on-unknown-properties: true
+      accept-float-as-int: false
+    mapper:
+      allow-coercion-of-scalars: false
   datasource:
     # foreign_keys=true: SQLite solo aplica las FK si se activan en cada conexión
     url: jdbc:sqlite:${APP_DB_PATH:./data/checkout.db}?foreign_keys=true
