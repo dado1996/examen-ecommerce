@@ -27,18 +27,21 @@ app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200}
 
-# Reglas de descuento parametrizables (ver docs/arquitectura.md, sección de supuestos)
+# Reglas de descuento parametrizables (ver docs/arquitectura.md, sección de supuestos).
+# Los decimales van entre comillas: sin ellas YAML los lee como double antes de convertirlos a BigDecimal.
 discounts:
   category:
     name: Tecnología
-    rate: 0.10
+    rate: "0.10"
   volume:
-    threshold: 100.00
-    rate: 0.05
+    threshold: "100.00"
+    rate: "0.05"
   coupon:
     code: WELCOME2026
-    rate: 0.15
-  max-total-rate: 0.35
+    rate: "0.15"
+    # Instante desde el cual el cupón deja de ser válido (exclusivo): vale todo 2026 en UTC.
+    expires-at: "2027-01-01T00:00:00Z"
+  max-total-rate: "0.35"
 
 management:
   endpoints:

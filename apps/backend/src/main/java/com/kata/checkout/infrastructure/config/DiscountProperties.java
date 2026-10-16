@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.Instant;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -19,7 +20,7 @@ public record DiscountProperties(
         @Valid @NotNull Category category,
         @Valid @NotNull Volume volume,
         @Valid @NotNull Coupon coupon,
-        @NotNull @DecimalMin("0.00") @DecimalMax("1.00") BigDecimal maxTotalRate) {
+        @NotNull @DecimalMin(value = "0.00", inclusive = false) @DecimalMax("1.00") BigDecimal maxTotalRate) {
 
     public record Category(
             @NotBlank String name,
@@ -31,8 +32,13 @@ public record DiscountProperties(
             @NotNull @DecimalMin("0.00") @DecimalMax("1.00") BigDecimal rate) {
     }
 
+    /**
+     * @param expiresAt instante desde el cual el cupón deja de ser válido (ISO-8601, p. ej.
+     *                  {@code 2027-01-01T00:00:00Z})
+     */
     public record Coupon(
             @NotBlank String code,
-            @NotNull @DecimalMin("0.00") @DecimalMax("1.00") BigDecimal rate) {
+            @NotNull @DecimalMin("0.00") @DecimalMax("1.00") BigDecimal rate,
+            @NotNull Instant expiresAt) {
     }
 }
