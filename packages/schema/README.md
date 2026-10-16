@@ -47,6 +47,8 @@ erDiagram
         TEXT total
         TEXT max_discount_rate "copia del tope vigente"
         TEXT created_at
+        TEXT idempotency_key UK "nullable: UUID"
+        TEXT request_hash "nullable: SHA-256"
     }
     checkout_items {
         INTEGER checkout_id PK,FK
@@ -108,6 +110,12 @@ Cabecera de la orden confirmada. Los tres montos son totales finales redondeados
 | `total` | TEXT | `subtotal - discount_total` (lo verifica un `CHECK`). |
 | `max_discount_rate` | TEXT | Copia de `discounts.max-total-rate` vigente. `discount_total` no puede superar `subtotal × max_discount_rate` (con medio centavo de tolerancia por el redondeo final). |
 | `created_at` | TEXT | ISO-8601 UTC. |
+| `idempotency_key` | TEXT | Header `Idempotency-Key` de `POST /checkouts`: UUID en minúsculas, `UNIQUE`, o NULL si no se envió. Varios NULL no chocan. |
+| `request_hash` | TEXT | SHA-256 hexadecimal del request normalizado. Obligatorio si hay clave y NULL si no (lo verifica un `CHECK`). |
+
+Una clave repetida con el mismo `request_hash` es un reintento: el backend devuelve la orden guardada. Con otro hash, responde `IDEMPOTENCY_KEY_REUSED`.
+
+> Las columnas de idempotencia están en el `CREATE TABLE`. Como no hay migraciones, una base local creada antes de este cambio no las tiene: hay que borrar `apps/backend/data/checkout.db` para que se recree.
 
 ### `checkout_items` (pivote)
 

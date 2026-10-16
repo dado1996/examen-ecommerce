@@ -73,6 +73,17 @@ debe_aceptar "conserva montos intermedios sin redondear" \
    VALUES (3, 1, 'CATEGORY', '0.10', 'Tecnología', '85.50', '8.550');
    SELECT amount FROM checkout_discounts WHERE checkout_id = 3;" "8.550"
 
+debe_aceptar "es idempotente: se puede cargar dos veces" \
+  "$(cat "$SCHEMA") SELECT count(*) FROM pragma_table_list WHERE name = 'checkouts' AND strict = 1;" "1"
+debe_aceptar "acepta un checkout con clave de idempotencia y hash del request" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate, idempotency_key, request_hash)
+   VALUES ('40.00', '0.00', '40.00', '0.35', '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+   SELECT id FROM checkouts WHERE idempotency_key = '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f';" "1"
+debe_aceptar "acepta varios checkouts sin clave de idempotencia" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate)
+   VALUES ('40.00', '0.00', '40.00', '0.35'), ('40.00', '0.00', '40.00', '0.35');
+   SELECT count(*) FROM checkouts WHERE idempotency_key IS NULL;" "2"
+
 echo "Datos corruptos"
 debe_rechazar "rechaza un precio guardado como REAL" \
   "INSERT INTO products (name, category, unit_price, initial_stock) VALUES ('X', 'Hogar', 10.5, 1);"
@@ -122,6 +133,22 @@ debe_rechazar "rechaza un descuento con tasa mayor que 1" \
   "INSERT INTO checkouts (id, subtotal, discount_total, total, max_discount_rate)
    VALUES (5, '10.00', '1.00', '9.00', '0.35');
    INSERT INTO checkout_discounts VALUES (5, 1, 'CATEGORY', '1.10', 'Tecnología', '10.00', '1.00');"
+debe_rechazar "rechaza una clave de idempotencia repetida" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate, idempotency_key, request_hash)
+   VALUES ('40.00', '0.00', '40.00', '0.35', '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+          ('25.00', '0.00', '25.00', '0.35', '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');"
+debe_rechazar "rechaza una clave de idempotencia sin hash del request" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate, idempotency_key)
+   VALUES ('40.00', '0.00', '40.00', '0.35', '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f');"
+debe_rechazar "rechaza un hash del request sin clave de idempotencia" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate, request_hash)
+   VALUES ('40.00', '0.00', '40.00', '0.35', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');"
+debe_rechazar "rechaza una clave de idempotencia que no es un UUID en minúsculas" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate, idempotency_key, request_hash)
+   VALUES ('40.00', '0.00', '40.00', '0.35', '3F0C9D2E-7B1A-4C5E-9F8D-2A6B4E1C0D7F', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');"
+debe_rechazar "rechaza un hash del request que no es SHA-256 hexadecimal" \
+  "INSERT INTO checkouts (subtotal, discount_total, total, max_discount_rate, idempotency_key, request_hash)
+   VALUES ('40.00', '0.00', '40.00', '0.35', '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f', 'abc');"
 debe_rechazar "impide borrar un producto que ya se vendió" \
   "$VALID_CHECKOUT DELETE FROM products WHERE id = 1;"
 debe_rechazar "impide borrar un usuario con checkouts" \

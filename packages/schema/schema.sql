@@ -84,7 +84,19 @@ CREATE TABLE IF NOT EXISTS checkouts (
                               AND max_discount_rate NOT GLOB '*.'
                               AND CAST(max_discount_rate AS REAL) BETWEEN 0 AND 1),
     created_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    -- Header Idempotency-Key de POST /checkouts: UUID canónico en minúsculas, o NULL si
+    -- el cliente no lo envió. UNIQUE admite varios NULL: solo choca una clave repetida.
+    idempotency_key    TEXT    UNIQUE
+                       CHECK (idempotency_key IS NULL
+                              OR idempotency_key GLOB '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'),
+    -- SHA-256 hexadecimal del request normalizado. Distingue un reintento (mismo hash)
+    -- de una clave reutilizada con otro carrito o cupón.
+    request_hash       TEXT
+                       CHECK (request_hash IS NULL
+                              OR (length(request_hash) = 64 AND request_hash NOT GLOB '*[^0-9a-f]*')),
 
+    -- Clave y hash van juntos: uno sin el otro no permite decidir si es un reintento.
+    CHECK ((idempotency_key IS NULL) = (request_hash IS NULL)),
     -- total = subtotal - discount_total. Con 2 decimales, cualquier diferencia real es >= 0.01.
     CHECK (abs(CAST(subtotal AS REAL) - CAST(discount_total AS REAL) - CAST(total AS REAL)) < 0.005),
     -- El descuento nunca supera el tope. Se tolera medio centavo por el redondeo
