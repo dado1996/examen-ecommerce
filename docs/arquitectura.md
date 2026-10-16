@@ -78,7 +78,20 @@ _(pendiente)_
 
 ## 6. Diseño de la API
 
-_(pendiente: endpoints, contratos y códigos de error)_
+Contrato en [`packages/contracts/openapi.yaml`](../packages/contracts/openapi.yaml). Detalle, ejemplos y decisiones en [`packages/contracts/README.md`](../packages/contracts/README.md).
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/v1/products` | Productos activos con stock disponible (vivo, no el inicial). |
+| `POST` | `/api/v1/checkouts/preview` | Desglose de descuentos sin guardar ni descontar stock. |
+| `POST` | `/api/v1/checkouts` | Reserva el stock, aplica la cascada y guarda la orden en una sola transacción. |
+
+- **Request cerrado:** el cliente solo envía `productId`, `quantity` y `couponCode`. Cualquier otra propiedad, como un precio, se rechaza con `VALIDATION_ERROR`.
+- **Dinero como string decimal** en el JSON, para que ningún extremo lo lea como flotante.
+- **La respuesta es el desglose completo** (líneas, pasos de la cascada, totales y `capApplied`). El frontend no repite el cálculo.
+- **Errores:** Problem Details con `code` estable: `VALIDATION_ERROR`, `EMPTY_CART`, `PRODUCT_NOT_FOUND`, `INVALID_COUPON`, `COUPON_EXPIRED`, `INSUFFICIENT_STOCK`, `DATA_INTEGRITY_VIOLATION`, `DATABASE_UNAVAILABLE` y `PERSISTENCE_ERROR`.
+
+_(pendiente: implementar los controladores, el motor y los cinco códigos de validación y negocio en el backend)_
 
 ## 7. Supuestos y hallazgos
 

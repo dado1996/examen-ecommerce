@@ -100,7 +100,15 @@ _(pendiente: completar a medida que se agreguen variables)_
 
 ## Endpoints
 
-_(pendiente)_
+Base `http://localhost:8080/api/v1`. El contrato completo está en [`packages/contracts`](packages/contracts/README.md).
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/products` | Lista los productos en stock |
+| `POST` | `/checkouts/preview` | Calcula el desglose de descuentos sin confirmar |
+| `POST` | `/checkouts` | Confirma la compra y guarda el checkout |
+
+_(pendiente: implementación en el backend)_
 
 ## Supuestos
 
