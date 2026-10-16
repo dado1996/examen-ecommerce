@@ -3,11 +3,35 @@
   min-height: 100vh;
 }
 
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: var(--radius);
+  transform: translateY(-200%);
+
+  &:focus {
+    transform: none;
+  }
+}
+
 .app-header {
-  padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+
+  h1 {
+    max-width: 72rem;
+    margin: 0 auto;
+    font-size: 1.5rem;
+  }
 }
 
 .app-main {
-  padding: 1rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-4);
 }
