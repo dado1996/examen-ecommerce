@@ -46,7 +46,7 @@ describe('CheckoutApi', () => {
     expect(recibido).toEqual(desglose);
   });
 
-  it('confirma la compra con POST /checkouts y devuelve la orden guardada', () => {
+  it('confirma la compra con POST /checkouts, envía la clave de idempotencia y devuelve la orden guardada', () => {
     const orden: Checkout = {
       id: 12,
       createdAt: '2026-10-15T19:30:00.000Z',
@@ -61,11 +61,14 @@ describe('CheckoutApi', () => {
     };
     let recibida: Checkout | undefined;
 
-    api.create({ items: [{ productId: 4, quantity: 1 }], couponCode: null }).subscribe((o) => (recibida = o));
+    api
+      .create({ items: [{ productId: 4, quantity: 1 }], couponCode: null }, '3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f')
+      .subscribe((o) => (recibida = o));
     const request = http.expectOne('http://api.test/api/v1/checkouts');
     request.flush(orden, { status: 201, statusText: 'Created' });
 
     expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f');
     expect(request.request.body).toEqual({ items: [{ productId: 4, quantity: 1 }], couponCode: null });
     expect(recibida).toEqual(orden);
   });

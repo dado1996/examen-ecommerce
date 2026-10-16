@@ -52,14 +52,16 @@ const ordenConfirmada: Checkout = { ...desgloseConCupon, id: 42, createdAt: '202
 class CheckoutApiFalso implements Pick<CheckoutApi, 'preview' | 'create'> {
   enviados: CheckoutRequest[] = [];
   compras: CheckoutRequest[] = [];
+  claves: string[] = [];
   respuesta: () => Observable<CheckoutBreakdown> = () => of(desgloseConCupon);
   respuestaCompra: () => Observable<Checkout> = () => of(ordenConfirmada);
   preview(request: CheckoutRequest): Observable<CheckoutBreakdown> {
     this.enviados.push(request);
     return this.respuesta();
   }
-  create(request: CheckoutRequest): Observable<Checkout> {
+  create(request: CheckoutRequest, idempotencyKey: string): Observable<Checkout> {
     this.compras.push(request);
+    this.claves.push(idempotencyKey);
     return this.respuestaCompra();
   }
 }
@@ -481,6 +483,98 @@ describe('CheckoutPage', () => {
 
     expect(page.querySelector('#coupon-error')?.textContent).toContain('El cupón ya venció');
     expect(campoCupon().getAttribute('aria-invalid')).toBe('true');
+  });
+
+  describe('clave de idempotencia', () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+    function fallaUnaVezYLuegoConfirma(): void {
+      let intentos = 0;
+      api.respuestaCompra = () =>
+        ++intentos === 1 ? throwError(() => problema(0, {})) : of(ordenConfirmada);
+    }
+
+    beforeEach(() => {
+      vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      api.respuestaCompra = () => throwError(() => problema(503, { code: 'DATABASE_UNAVAILABLE' }));
+    });
+
+    it('cada pago envía una clave UUID generada en el navegador', async () => {
+      await render();
+
+      await pagar();
+
+      expect(api.claves).toHaveLength(1);
+      expect(api.claves[0]).toMatch(UUID);
+    });
+
+    it('un reintento del mismo pago reutiliza la clave para que el backend no cobre dos veces', async () => {
+      fallaUnaVezYLuegoConfirma();
+      await render();
+
+      await pagar();
+      await pagar();
+
+      expect(api.claves).toHaveLength(2);
+      expect(api.claves[1]).toBe(api.claves[0]);
+    });
+
+    it('cambiar el cupón descarta la clave y el siguiente pago usa una nueva', async () => {
+      await render();
+      await pagar();
+
+      await escribirCupon('WELCOME2026');
+      await pagar();
+
+      expect(api.claves[1]).toMatch(UUID);
+      expect(api.claves[1]).not.toBe(api.claves[0]);
+    });
+
+    it('espacios alrededor del cupón no cambian el pedido ni la clave', async () => {
+      await render();
+      await escribirCupon('WELCOME2026');
+      await pagar();
+
+      await escribirCupon(' WELCOME2026 ');
+      await pagar();
+
+      expect(api.claves[1]).toBe(api.claves[0]);
+    });
+
+    it('cambiar las cantidades del carrito descarta la clave', async () => {
+      await render();
+      await pagar();
+
+      cart.setQuantity(teclado, 1);
+      await pagar();
+
+      expect(api.claves[1]).not.toBe(api.claves[0]);
+    });
+
+    it('si el backend rechaza la clave como reutilizada lo explica y el siguiente pago usa otra', async () => {
+      let intentos = 0;
+      api.respuestaCompra = () =>
+        ++intentos === 1 ? throwError(() => problema(409, { code: 'IDEMPOTENCY_KEY_REUSED' })) : of(ordenConfirmada);
+      await render();
+
+      await pagar();
+      expect(page.querySelector('[role="alert"]')?.textContent).toContain('Revisa tu carrito');
+
+      await pagar();
+      expect(api.claves[1]).not.toBe(api.claves[0]);
+    });
+
+    it('después de una compra confirmada el siguiente carrito usa otra clave', async () => {
+      api.respuestaCompra = () => of(ordenConfirmada);
+      await render();
+      await pagar();
+
+      cart.setQuantity(laptop, 2);
+      cart.setQuantity(teclado, 3);
+      await pagar();
+
+      expect(api.claves[1]).not.toBe(api.claves[0]);
+    });
   });
 
   it('si la base no está disponible permite reintentar el pago', async () => {

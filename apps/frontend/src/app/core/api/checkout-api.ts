@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -22,8 +22,12 @@ export class CheckoutApi {
   /**
    * Confirma la compra (`POST /checkouts`): el backend vuelve a validar todo, reserva el stock,
    * aplica la cascada y guarda la orden en una sola transacción. Devuelve la orden con su desglose.
+   * @param idempotencyKey UUID del intento de pago: si llega un reintento con la misma clave y el
+   *   mismo pedido, el backend devuelve la orden ya creada en lugar de crear otra.
    */
-  create(request: CheckoutRequest): Observable<Checkout> {
-    return this.http.post<Checkout>(`${this.baseUrl}/checkouts`, request);
+  create(request: CheckoutRequest, idempotencyKey: string): Observable<Checkout> {
+    return this.http.post<Checkout>(`${this.baseUrl}/checkouts`, request, {
+      headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }),
+    });
   }
 }

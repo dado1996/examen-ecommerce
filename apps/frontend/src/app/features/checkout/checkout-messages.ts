@@ -18,6 +18,8 @@ export function errorMessage(problem: ApiProblem, productName: (id: number) => s
       return 'El cupón ya venció.';
     case 'INSUFFICIENT_STOCK':
       return `No hay stock suficiente de ${name}: pediste ${problem.requested ?? '?'} y quedan ${problem.available ?? '?'}. Vuelve a productos para ajustar la cantidad.`;
+    case 'IDEMPOTENCY_KEY_REUSED':
+      return 'Tu compra cambió mientras se procesaba un intento anterior. Revisa tu carrito e intenta de nuevo.';
     case 'PRODUCT_NOT_FOUND':
       return 'Un producto de tu carrito ya no está disponible. Vuelve a productos para actualizar tu selección.';
     case 'EMPTY_CART':

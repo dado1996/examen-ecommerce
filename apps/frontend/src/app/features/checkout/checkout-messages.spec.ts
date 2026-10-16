@@ -26,6 +26,10 @@ describe('errorMessage', () => {
     expect(errorMessage({ code: 'UNKNOWN_ERROR' }, () => undefined)).toContain('No pudimos calcular');
   });
 
+  it('si la clave del pago se reutilizó con otro pedido pide revisar el carrito y volver a intentar', () => {
+    expect(errorMessage({ code: 'IDEMPOTENCY_KEY_REUSED' }, () => undefined)).toContain('Revisa tu carrito');
+  });
+
   it('tiene un mensaje para cada code del contrato', () => {
     const codes = [
       'VALIDATION_ERROR',
@@ -34,6 +38,7 @@ describe('errorMessage', () => {
       'INVALID_COUPON',
       'COUPON_EXPIRED',
       'INSUFFICIENT_STOCK',
+      'IDEMPOTENCY_KEY_REUSED',
       'DATA_INTEGRITY_VIOLATION',
       'DATABASE_UNAVAILABLE',
       'PERSISTENCE_ERROR',

@@ -24,7 +24,8 @@ type PreviewState =
  * - "Aplicar descuento" pide a `POST /checkouts/preview` que valide el cupón contra la
  *   configuración y calcule la cascada completa, sin guardar ni reservar.
  * - "Ir a pagar" confirma con `POST /checkouts`, que vuelve a validar todo, reserva el stock y
- *   guarda la orden. Con éxito vacía el carrito y lleva a la confirmación.
+ *   guarda la orden. Con éxito vacía el carrito y lleva a la confirmación. Cada intento de pago
+ *   lleva una `Idempotency-Key`: un reintento no crea una segunda orden.
  * Solo se llega con productos en el carrito (`cartNotEmptyGuard`).
  */
 @Component({
@@ -45,6 +46,18 @@ export class CheckoutPage {
   protected readonly preview = signal<PreviewState>({ status: 'idle' });
   protected readonly paying = signal(false);
   private readonly paymentProblem = signal<ApiProblem | null>(null);
+  /** Se incrementa para descartar la clave del intento aunque el pedido no haya cambiado. */
+  private readonly attemptReset = signal(0);
+  /**
+   * Intento de pago: el pedido y su `Idempotency-Key`. Se recalcula, con un UUID nuevo, solo cuando
+   * cambian los productos, las cantidades o el cupón (normalizado); mientras tanto, cada reintento
+   * reutiliza la clave y el backend devuelve la orden ya creada en vez de crear otra.
+   * Es el único `computed` con efecto (genera un UUID): ese es justo el valor que se memoriza.
+   */
+  private readonly attempt = computed(() => {
+    this.attemptReset();
+    return { request: this.request(), idempotencyKey: crypto.randomUUID() };
+  });
 
   protected readonly loading = computed(() => this.preview().status === 'loading');
   /** Hay una petición en curso: ningún botón puede disparar otra (evita una compra doble). */
@@ -101,8 +114,9 @@ export class CheckoutPage {
     }
     this.paymentProblem.set(null);
     this.paying.set(true);
+    const { request, idempotencyKey } = this.attempt();
     this.api
-      .create(this.request())
+      .create(request, idempotencyKey)
       .pipe(
         finalize(() => this.paying.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -113,7 +127,13 @@ export class CheckoutPage {
           this.cart.clear();
           void this.router.navigateByUrl('/confirmacion');
         },
-        error: (error: unknown) => this.paymentProblem.set(readProblem(error)),
+        error: (error: unknown) => {
+          const problem = readProblem(error);
+          if (problem.code === 'IDEMPOTENCY_KEY_REUSED') {
+            this.attemptReset.update((n) => n + 1);
+          }
+          this.paymentProblem.set(problem);
+        },
       });
   }
 
