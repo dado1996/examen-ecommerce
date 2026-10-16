@@ -1,0 +1,117 @@
+:host {
+  display: block;
+}
+
+.product-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+.product-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.product-card__name {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.product-card__details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  dt {
+    color: var(--color-text-muted);
+  }
+
+  dd {
+    margin: 0;
+    text-align: right;
+  }
+}
+
+.product-card__price {
+  font-weight: 600;
+}
+
+.quantity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.quantity__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.quantity__input {
+  width: 4rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  font: inherit;
+  text-align: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.cart-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.cart-bar__info {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.cart-bar__summary,
+.cart-bar__subtotal {
+  margin: 0;
+}
+
+.cart-bar__summary {
+  color: var(--color-text-muted);
+}
+
+.cart-bar__subtotal strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cart-bar__hint {
+  margin-left: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}

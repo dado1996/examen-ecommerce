@@ -1,0 +1,98 @@
+<section class="catalog" aria-labelledby="catalog-title">
+  <h2 id="catalog-title">Productos</h2>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p role="status" class="notice">Cargando productos…</p>
+    }
+    @case ('error') {
+      <div role="alert" class="notice notice--error">
+        <p>No pudimos cargar los productos. Revisa tu conexión e intenta de nuevo.</p>
+        <button type="button" class="button" (click)="load()">Reintentar</button>
+      </div>
+    }
+    @case ('ready') {
+      @if (products().length === 0) {
+        <p class="notice">No hay productos con stock disponible en este momento.</p>
+      } @else {
+        <ul class="product-list">
+          @for (product of products(); track product.id) {
+            <li class="product-card">
+              <h3 class="product-card__name">{{ product.name }}</h3>
+              <dl class="product-card__details">
+                <div>
+                  <dt>Categoría</dt>
+                  <dd>{{ product.category }}</dd>
+                </div>
+                <div>
+                  <dt>Precio</dt>
+                  <dd class="product-card__price">{{ formatMoney(product.unitPrice) }}</dd>
+                </div>
+                <div>
+                  <dt>Stock</dt>
+                  <dd>{{ product.availableStock }} disponibles</dd>
+                </div>
+              </dl>
+
+              <div class="quantity">
+                <label class="quantity__label" [for]="'quantity-' + product.id">
+                  Cantidad <span class="visually-hidden">de {{ product.name }}</span>
+                </label>
+                <div class="quantity__controls">
+                  <button
+                    type="button"
+                    class="button button--icon"
+                    [attr.aria-label]="'Quitar una unidad de ' + product.name"
+                    [disabled]="cart.quantityOf(product.id) === 0"
+                    (click)="cart.decrement(product)"
+                  >
+                    <span aria-hidden="true">−</span>
+                  </button>
+                  <input
+                    class="quantity__input"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    step="1"
+                    [id]="'quantity-' + product.id"
+                    [max]="product.availableStock"
+                    [value]="cart.quantityOf(product.id)"
+                    (change)="onQuantityChange(product, $event)"
+                  />
+                  <button
+                    type="button"
+                    class="button button--icon"
+                    [attr.aria-label]="'Agregar una unidad de ' + product.name"
+                    [disabled]="cart.quantityOf(product.id) >= product.availableStock"
+                    (click)="cart.increment(product)"
+                  >
+                    <span aria-hidden="true">+</span>
+                  </button>
+                </div>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>
+
+<div class="cart-bar">
+  <div class="cart-bar__info" aria-live="polite">
+    <p id="cart-summary" class="cart-bar__summary">{{ cart.summary() }}</p>
+    <p class="cart-bar__subtotal">
+      Subtotal <strong>{{ formatMoney(cart.subtotal()) }}</strong>
+      <span class="cart-bar__hint">antes de descuentos</span>
+    </p>
+  </div>
+  <button
+    type="button"
+    class="button button--primary"
+    aria-describedby="cart-summary"
+    [disabled]="cart.isEmpty()"
+    (click)="goToCheckout()"
+  >
+    Ir al checkout
+  </button>
+</div>
