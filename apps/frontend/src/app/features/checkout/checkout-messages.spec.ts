@@ -30,6 +30,18 @@ describe('errorMessage', () => {
     expect(errorMessage({ code: 'IDEMPOTENCY_KEY_REUSED' }, () => undefined)).toContain('Revisa tu carrito');
   });
 
+  it('pide esperar si se superó el límite de solicitudes', () => {
+    expect(errorMessage({ code: 'TOO_MANY_REQUESTS' }, () => undefined)).toBe(
+      'Hiciste demasiados intentos seguidos. Espera unos minutos e intenta de nuevo.',
+    );
+  });
+
+  it('pide reducir el carrito si la solicitud es demasiado grande', () => {
+    expect(errorMessage({ code: 'PAYLOAD_TOO_LARGE' }, () => undefined)).toBe(
+      'Tu carrito es demasiado grande para procesarlo. Quita algunos productos e intenta de nuevo.',
+    );
+  });
+
   it('tiene un mensaje para cada code del contrato', () => {
     const codes = [
       'VALIDATION_ERROR',
@@ -42,6 +54,8 @@ describe('errorMessage', () => {
       'DATA_INTEGRITY_VIOLATION',
       'DATABASE_UNAVAILABLE',
       'PERSISTENCE_ERROR',
+      'PAYLOAD_TOO_LARGE',
+      'TOO_MANY_REQUESTS',
     ] as const;
 
     for (const code of codes) {
@@ -55,5 +69,6 @@ describe('isCouponError', () => {
     expect(isCouponError('INVALID_COUPON')).toBe(true);
     expect(isCouponError('COUPON_EXPIRED')).toBe(true);
     expect(isCouponError('INSUFFICIENT_STOCK')).toBe(false);
+    expect(isCouponError('TOO_MANY_REQUESTS')).toBe(false);
   });
 });

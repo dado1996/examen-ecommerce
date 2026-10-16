@@ -29,6 +29,10 @@ export function errorMessage(problem: ApiProblem, productName: (id: number) => s
       return 'Hay datos inválidos en tu carrito. Vuelve a productos y revisa tu selección.';
     case 'DATABASE_UNAVAILABLE':
       return 'El servicio no está disponible en este momento. Intenta de nuevo en unos segundos.';
+    case 'TOO_MANY_REQUESTS':
+      return 'Hiciste demasiados intentos seguidos. Espera unos minutos e intenta de nuevo.';
+    case 'PAYLOAD_TOO_LARGE':
+      return 'Tu carrito es demasiado grande para procesarlo. Quita algunos productos e intenta de nuevo.';
     case 'NETWORK_ERROR':
       return 'No pudimos conectarnos con la tienda. Revisa tu conexión e intenta de nuevo.';
     case 'PERSISTENCE_ERROR':

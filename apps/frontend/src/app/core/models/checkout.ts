@@ -62,6 +62,8 @@ export const PROBLEM_CODES = [
   'DATA_INTEGRITY_VIOLATION',
   'DATABASE_UNAVAILABLE',
   'PERSISTENCE_ERROR',
+  'PAYLOAD_TOO_LARGE',
+  'TOO_MANY_REQUESTS',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
