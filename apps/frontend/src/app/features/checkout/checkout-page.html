@@ -23,7 +23,9 @@
           <tr>
             <th scope="row">
               {{ item.product.name }}
-              <span class="cart-table__unit-detail">{{ item.quantity }} × {{ formatMoney(item.product.unitPrice) }}</span>
+              <span class="cart-table__unit-detail"
+                >{{ item.quantity }} × {{ formatMoney(item.product.unitPrice) }}</span
+              >
             </th>
             <td class="numeric col-unit-price">{{ formatMoney(item.product.unitPrice) }}</td>
             <td class="numeric">{{ item.quantity }}</td>
@@ -43,7 +45,9 @@
   </div>
 
   <form class="coupon" novalidate (submit)="applyDiscount($event)">
-    <label class="coupon__label" for="coupon-code">Código de cupón <span class="coupon__optional">(opcional)</span></label>
+    <label class="coupon__label" for="coupon-code"
+      >Código de cupón <span class="coupon__optional">(opcional)</span></label
+    >
     <div class="coupon__row">
       <input
         id="coupon-code"
@@ -85,8 +89,9 @@
     @if (result.capApplied) {
       <div role="alert" class="notice notice--warning">
         <p>
-          Alcanzaste el descuento máximo del {{ maxRate() }}. Tu descuento se limitó a
-          <strong>{{ formatMoney(result.discountTotal) }}</strong>.
+          ¡Enhorabuena! Has alcanzado el límite máximo de ahorro permitido
+          <strong>{{ '(' + formatMoney(result.discountTotal) + ')' }}</strong
+          >.
         </p>
       </div>
     }
@@ -103,7 +108,12 @@
       Al pagar se confirma la compra: se validan de nuevo los productos, el stock y los descuentos,
       y se guarda la orden.
     </p>
-    <button type="button" class="button button--primary pay__button" [disabled]="busy()" (click)="pay()">
+    <button
+      type="button"
+      class="button button--primary pay__button"
+      [disabled]="busy()"
+      (click)="pay()"
+    >
       {{ paying() ? 'Procesando pago…' : 'Ir a pagar' }}
     </button>
   </div>

@@ -28,14 +28,14 @@ _(pendiente: ejemplo de invocación y resultado)_
 
 ### Porcentaje de código sugerido por IA
 
-_(pendiente: estimar al cierre, por módulo)_
+Aproximadamente 63%
 
-| Módulo                  | % sugerido por IA | Lógica crítica implementada o reescrita manualmente |
-| ----------------------- | ----------------- | --------------------------------------------------- |
-| Estructura del proyecto | _(pendiente)_     |                                                     |
-| Motor de descuentos     | _(pendiente)_     |                                                     |
-| Checkout / stock        | _(pendiente)_     |                                                     |
-| Frontend                | _(pendiente)_     |                                                     |
+| Módulo                  | % sugerido por IA | Lógica crítica implementada o reescrita manualmente                        |
+| ----------------------- | ----------------- | -------------------------------------------------------------------------- |
+| Estructura del proyecto | 0%                | Estructura general del proyecto. Documentación. Schema de la base de datos |
+| Motor de descuentos     | 60%.              | Motor de descuentos. Casos borde                                           |
+| Checkout / stock        | 60%               |                                                                            |
+| Frontend                | 70%.              | Mensajes de alerta, posicionamiento de elementos, condiciones, excepciones |
 
 ### Registro
 
