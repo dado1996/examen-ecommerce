@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 
 import { API_BASE_URL } from './api-base-url.token';
 import { CheckoutApi } from './checkout-api';
-import { CheckoutBreakdown } from '../models/checkout';
+import { Checkout, CheckoutBreakdown } from '../models/checkout';
 
 describe('CheckoutApi', () => {
   let api: CheckoutApi;
@@ -44,5 +44,29 @@ describe('CheckoutApi', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ items: [{ productId: 4, quantity: 1 }], couponCode: 'WELCOME2026' });
     expect(recibido).toEqual(desglose);
+  });
+
+  it('confirma la compra con POST /checkouts y devuelve la orden guardada', () => {
+    const orden: Checkout = {
+      id: 12,
+      createdAt: '2026-10-15T19:30:00.000Z',
+      couponCode: null,
+      lines: [],
+      discounts: [],
+      subtotal: '40.00',
+      discountTotal: '0.00',
+      total: '40.00',
+      maxDiscountRate: '0.35',
+      capApplied: false,
+    };
+    let recibida: Checkout | undefined;
+
+    api.create({ items: [{ productId: 4, quantity: 1 }], couponCode: null }).subscribe((o) => (recibida = o));
+    const request = http.expectOne('http://api.test/api/v1/checkouts');
+    request.flush(orden, { status: 201, statusText: 'Created' });
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ items: [{ productId: 4, quantity: 1 }], couponCode: null });
+    expect(recibida).toEqual(orden);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Tipos del checkout según packages/contracts/openapi.yaml (CheckoutRequest, CheckoutBreakdown,
- * AppliedDiscount y ProblemCode). _(pendiente: generarlos del contrato en lugar de escribirlos a mano)_
+ * AppliedDiscount, Checkout y ProblemCode). _(pendiente: generarlos del contrato en lugar de escribirlos a mano)_
  */
 
 /** Lo único que el cliente envía: productos, cantidades y cupón. Nunca precios. */
@@ -41,6 +41,13 @@ export interface CheckoutBreakdown {
   readonly total: string;
   readonly maxDiscountRate: string;
   readonly capApplied: boolean;
+}
+
+/** Checkout confirmado y guardado (`POST /checkouts`): el desglose más su número y fecha. */
+export interface Checkout extends CheckoutBreakdown {
+  readonly id: number;
+  /** ISO-8601 UTC asignado por el backend. */
+  readonly createdAt: string;
 }
 
 /** Códigos de negocio estables de Problem Details (RFC 9457). */
