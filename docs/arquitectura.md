@@ -51,14 +51,15 @@ Detalle, decisiones y pendientes de integración en [`packages/schema/README.md`
 
 ```
 core/
-  api/      # CatalogApi (GET /products), CheckoutApi (POST /checkouts/preview), readProblem y API_BASE_URL
+  api/      # CatalogApi (GET /products), CheckoutApi (preview y POST /checkouts), readProblem y API_BASE_URL
   models/   # Product y tipos del checkout, escritos a mano según el contrato (pendiente: generarlos)
   money/    # formatMoney, cents (centavos bigint) y decimal (HALF_EVEN y porcentajes, sin number)
 features/
   catalog/  # CatalogPage: lista de productos y selección de cantidades (HU1)
   cart/     # CartStore: estado del carrito con Signals (HU1)
-  checkout/ # CheckoutPage (productos, cupón, desglose y alerta del tope), mensajes por code y cartNotEmptyGuard (pendiente: confirmar la compra)
-shared/     # Componentes de UI reutilizables
+  checkout/ # CheckoutPage (productos, cupón, desglose, alerta del tope y pago), mensajes por code y cartNotEmptyGuard
+  confirmation/ # ConfirmationPage, ConfirmationStore y hasConfirmationGuard
+shared/ui/  # BreakdownPanel y breakdownRows: el desglose que comparten checkout y confirmación
 ```
 
 - **El carrito guarda cantidades y muestra el subtotal.** `CartStore` guarda cada producto elegido con su cantidad. Al checkout solo envía `productId` y `quantity`. Muestra en tiempo real el subtotal antes de descuentos (precio × cantidad); los descuentos y el total final los calcula siempre el backend.
@@ -70,6 +71,9 @@ shared/     # Componentes de UI reutilizables
 - **El frontend no recalcula descuentos, solo los muestra.** Cada paso llega sin redondear y se muestra redondeado `HALF_EVEN` (la misma regla del backend) con aritmética `bigint`. El ajuste del tope se muestra como la suma de esos pasos menos el `discountTotal` del backend, para que el desglose siempre cuadre a la vista. Sin tope, la suma de los pasos redondeados puede diferir en un centavo del descuento total; el total autoritativo es siempre el del backend.
 - **Errores por `code`, nunca por `detail`.** `readProblem` reduce cualquier error a un `code` del contrato, o a `NETWORK_ERROR` o `UNKNOWN_ERROR`. Los errores del cupón se muestran junto al campo (`aria-invalid` y `aria-describedby`). Los demás, como el stock insuficiente, se muestran como alerta y nombran el producto. Cambiar el cupón descarta el desglose y el error anteriores.
 - **Alerta del tope (HU4).** Si `capApplied` es `true`, se muestra un `role="alert"` con el tope y el descuento limitado. Con la configuración actual no se alcanza (máximo 27,325%), así que solo la cubren las pruebas unitarias.
+- **"Ir a pagar" confirma con `POST /checkouts`.** El backend vuelve a validar todo (productos, stock, cupón y descuentos), reserva el stock y guarda la orden en una sola transacción. No hace falta aplicar el descuento antes: si hay un cupón escrito se envía igual. Con éxito, la respuesta (orden con id, fecha y desglose) se guarda en `ConfirmationStore`, se vacía el carrito y se navega a `/confirmacion`. Si falla, el carrito se conserva y el error se muestra igual que en el preview. No hay pasarela de pago: el botón registra la orden, no cobra.
+- **Sin compra doble.** Mientras hay una petición en curso, "Aplicar descuento" e "Ir a pagar" se deshabilitan. El backend no tiene clave de idempotencia, así que esta protección es solo del cliente. _(pendiente: `Idempotency-Key` en `POST /checkouts`)_
+- **La confirmación vive en memoria.** El contrato no expone `GET /checkouts/{id}`, así que `/confirmacion` muestra la respuesta guardada en `ConfirmationStore`. `hasConfirmationGuard` redirige a productos si no hay una compra recién confirmada, por ejemplo al recargar la página. Al llegar, el foco va al título para que los lectores de pantalla anuncien la confirmación.
 - **Sin correo electrónico.** Se evaluó pedirlo en el checkout, pero no está en el contrato (`CheckoutRequest` es cerrado) y `users` exige también el nombre. Se decidió no incluirlo.
 - **Dinero solo como texto.** `formatMoney("1200.00")` da `"USD 1,200.00"` insertando separadores sobre el string, sin pasar por `number`.
 - **Accesibilidad básica:** `lang="es"`, enlace para saltar al contenido, un título de página por ruta, foco visible, etiquetas que nombran el producto ("Cantidad de Cuaderno"), botones `−`/`+` con nombre accesible, estados de carga (`role="status"`) y de error (`role="alert"`) anunciados, resumen del carrito en una región `aria-live`, tabla del checkout con `caption` y encabezados con `scope` (en pantallas angostas oculta la columna de precio y muestra "2 × USD 1,200.00" bajo el nombre), áreas táctiles de 44 px y colores con contraste AA.

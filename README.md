@@ -63,7 +63,8 @@ La aplicación queda en `http://localhost:4200` y espera el backend en `http://l
 | Ruta | Vista |
 |---|---|
 | `/` | Selección de productos: catálogo con stock, cantidad por producto y subtotal en tiempo real |
-| `/checkout` | Productos del carrito con su subtotal, cupón y botón "Aplicar descuento": desglose de cada descuento, total a pagar y alerta del tope del 35%. Solo se entra con productos en el carrito. _(pendiente: confirmar la compra)_ |
+| `/checkout` | Productos del carrito con su subtotal, cupón y botón "Aplicar descuento" (desglose de cada descuento, total y alerta del tope del 35%). "Ir a pagar" confirma la compra. Solo se entra con productos en el carrito. |
+| `/confirmacion` | Orden confirmada: número, fecha, productos comprados y totales desglosados exactos. Solo se entra después de pagar. |
 
 ## Pruebas y cobertura
 
