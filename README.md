@@ -63,7 +63,7 @@ La aplicación queda en `http://localhost:4200` y espera el backend en `http://l
 | Ruta | Vista |
 |---|---|
 | `/` | Selección de productos: catálogo con stock, cantidad por producto y subtotal en tiempo real |
-| `/checkout` | Checkout _(pendiente: cupón, desglose, alerta del 35% y confirmación)_ |
+| `/checkout` | Productos del carrito con su subtotal y el campo del cupón. Solo se entra con productos en el carrito. _(pendiente: desglose, alerta del 35% y confirmación)_ |
 
 ## Pruebas y cobertura
 

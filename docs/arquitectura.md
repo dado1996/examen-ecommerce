@@ -57,15 +57,18 @@ core/
 features/
   catalog/  # CatalogPage: lista de productos y selección de cantidades (HU1)
   cart/     # CartStore: estado del carrito con Signals (HU1)
-  checkout/ # CheckoutPage: por ahora solo resume la selección (pendiente: HU2, HU4)
+  checkout/ # CheckoutPage (productos, subtotal y cupón) y cartNotEmptyGuard (pendiente: desglose y confirmación, HU2 y HU4)
 shared/     # Componentes de UI reutilizables
 ```
 
 - **El carrito guarda cantidades y muestra el subtotal.** `CartStore` guarda cada producto elegido con su cantidad. Al checkout solo envía `productId` y `quantity`. Muestra en tiempo real el subtotal antes de descuentos (precio × cantidad); los descuentos y el total final los calcula siempre el backend.
 - **Subtotal exacto en centavos `bigint`.** Para no romper la regla de no usar flotantes, `"89.90"` se convierte a `8990n` y se opera como entero: 3 × 89.90 da exactamente `269.70` (con `number` daría `269.70000000000005`). Se descartó llamar a `POST /checkouts/preview` en cada cambio: sería una petición por clic, y el subtotal no necesita reglas de negocio.
 - **Cantidades saneadas en el cliente.** Una cantidad negativa, decimal o no numérica se corrige a un entero entre 0 y `availableStock`. Al recargar el catálogo, `reconcile` recorta la selección al stock vigente y quita los productos que ya no están. Es una ayuda de UX: el backend vuelve a validar todo.
+- **Al checkout solo se entra desde el botón.** `cartNotEmptyGuard` redirige a `/` si el carrito está vacío. Como el carrito vive en memoria, eso cubre una URL escrita a mano y una recarga de la página.
+- **El cupón se guarda en el carrito sin validarlo.** `CartStore` guarda el texto tal como se escribió (hasta 50 caracteres, el máximo del contrato) y expone una versión sin espacios, o `null` si está en blanco, para enviarla. El backend decide si es válido o expiró.
+- **Sin correo electrónico.** Se evaluó pedirlo en el checkout, pero no está en el contrato (`CheckoutRequest` es cerrado) y `users` exige también el nombre. Se decidió no incluirlo.
 - **Dinero solo como texto.** `formatMoney("1200.00")` da `"USD 1,200.00"` insertando separadores sobre el string, sin pasar por `number`.
-- **Accesibilidad básica:** `lang="es"`, enlace para saltar al contenido, un título de página por ruta, foco visible, etiquetas que nombran el producto ("Cantidad de Cuaderno"), botones `−`/`+` con nombre accesible, estados de carga (`role="status"`) y de error (`role="alert"`) anunciados, resumen del carrito en una región `aria-live`, áreas táctiles de 44 px y colores con contraste AA.
+- **Accesibilidad básica:** `lang="es"`, enlace para saltar al contenido, un título de página por ruta, foco visible, etiquetas que nombran el producto ("Cantidad de Cuaderno"), botones `−`/`+` con nombre accesible, estados de carga (`role="status"`) y de error (`role="alert"`) anunciados, resumen del carrito en una región `aria-live`, tabla del checkout con `caption` y encabezados con `scope` (en pantallas angostas oculta la columna de precio y muestra "2 × USD 1,200.00" bajo el nombre), áreas táctiles de 44 px y colores con contraste AA.
 
 ## 3. Aislamiento del motor de descuentos
 
