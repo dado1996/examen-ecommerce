@@ -2,12 +2,15 @@ package com.kata.checkout.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.kata.checkout.domain.model.AppliedDiscount;
 import com.kata.checkout.domain.model.DiscountRule;
+import com.kata.checkout.domain.model.Idempotency;
 import com.kata.checkout.domain.model.Order;
 import com.kata.checkout.domain.model.OrderLine;
 import com.kata.checkout.domain.model.SavedOrder;
+import com.kata.checkout.domain.model.StoredCheckout;
 import com.kata.checkout.domain.port.OrderRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,6 +23,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
+
+    private static final String CLAVE = "3f0c9d2e-7b1a-4c5e-9f8d-2a6b4e1c0d7f";
+    private static final String HASH = "a".repeat(64);
 
     @Autowired
     private OrderRepository orders;
@@ -239,6 +245,62 @@ class JdbcOrderRepositoryTest extends SqliteIntegrationTest {
         assertThat(orders.findById(id)).contains(montosExtremos);
         assertThat(jdbc.queryForObject("SELECT subtotal FROM checkouts WHERE id = ?", String.class, id))
                 .isEqualTo("12345678901234567.89");
+    }
+
+    @Test
+    void sinClaveDeIdempotenciaGuardaLaClaveYElHashComoNulos() {
+        long id = orders.save(ordenConCupon()).id();
+
+        assertThat(jdbc.queryForMap("SELECT idempotency_key, request_hash FROM checkouts WHERE id = ?", id))
+                .containsEntry("idempotency_key", null)
+                .containsEntry("request_hash", null);
+    }
+
+    @Test
+    void guardaLaClaveDeIdempotenciaYElHashDelPedido() {
+        long id = orders.save(ordenConCupon(), new Idempotency(CLAVE, HASH)).id();
+
+        assertThat(jdbc.queryForMap("SELECT idempotency_key, request_hash FROM checkouts WHERE id = ?", id))
+                .containsEntry("idempotency_key", CLAVE)
+                .containsEntry("request_hash", HASH);
+    }
+
+    @Test
+    void buscaPorClaveYReconstruyeElDesgloseConLosNombresDelCatalogo() {
+        Order original = ordenConCupon();
+        SavedOrder guardada = orders.save(original, new Idempotency(CLAVE, HASH));
+
+        StoredCheckout encontrado = orders.findByIdempotencyKey(CLAVE).orElseThrow();
+
+        assertThat(encontrado.id()).isEqualTo(guardada.id());
+        assertThat(encontrado.createdAt()).isEqualTo(guardada.createdAt());
+        assertThat(encontrado.requestHash()).isEqualTo(HASH);
+        assertThat(encontrado.breakdown().lines()).extracting(l -> l.product().name(), l -> l.quantity())
+                .containsExactly(tuple("Laptop 14\"", 2), tuple("Lámpara de escritorio", 1));
+        assertThat(encontrado.breakdown().lines()).extracting(l -> l.product().unitPrice())
+                .containsExactly(new BigDecimal("1200.00"), new BigDecimal("40.00"));
+        assertThat(encontrado.breakdown().result().discounts()).isEqualTo(original.discounts());
+        assertThat(encontrado.breakdown().result().couponCode()).isEqualTo("WELCOME2026");
+        assertThat(encontrado.breakdown().toOrder())
+                .isEqualTo(new Order(null, original.couponCode(), original.lines(), original.discounts(),
+                        original.subtotal(), original.discountTotal(), original.total(), original.maxDiscountRate()));
+    }
+
+    @Test
+    void devuelveVacioSiLaClaveDeIdempotenciaNoExiste() {
+        orders.save(ordenConCupon(), new Idempotency(CLAVE, HASH));
+
+        assertThat(orders.findByIdempotencyKey("00000000-0000-4000-8000-000000000000")).isEmpty();
+    }
+
+    @Test
+    void rechazaUnaClaveDeIdempotenciaRepetidaSinGuardarLaSegundaOrden() {
+        orders.save(ordenConCupon(), new Idempotency(CLAVE, HASH));
+        int filasAntes = contarFilas();
+
+        assertThatThrownBy(() -> orders.save(ordenConCupon(), new Idempotency(CLAVE, HASH)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(contarFilas()).isEqualTo(filasAntes);
     }
 
     private int contarFilas() {

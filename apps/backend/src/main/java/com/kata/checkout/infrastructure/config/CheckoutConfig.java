@@ -2,6 +2,7 @@ package com.kata.checkout.infrastructure.config;
 
 import com.kata.checkout.application.CatalogService;
 import com.kata.checkout.application.CheckoutService;
+import com.kata.checkout.application.UnitOfWork;
 import com.kata.checkout.domain.discount.DiscountEngine;
 import com.kata.checkout.domain.port.OrderRepository;
 import com.kata.checkout.domain.port.ProductCatalog;
@@ -31,7 +32,7 @@ public class CheckoutConfig {
 
     @Bean
     CheckoutService checkoutService(ProductCatalog catalog, StockRepository stock, OrderRepository orders,
-                                    DiscountEngine discountEngine) {
-        return new CheckoutService(catalog, stock, orders, discountEngine);
+                                    DiscountEngine discountEngine, UnitOfWork transactions) {
+        return new CheckoutService(catalog, stock, orders, discountEngine, transactions);
     }
 }
