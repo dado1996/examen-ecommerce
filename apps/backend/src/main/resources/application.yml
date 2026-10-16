@@ -8,11 +8,20 @@ spring:
     problemdetails:
       enabled: true # Errores en formato RFC 9457, sin trazas internas
   datasource:
-    url: jdbc:sqlite:./data/checkout.db
+    # foreign_keys=true: SQLite solo aplica las FK si se activan en cada conexión
+    url: jdbc:sqlite:${APP_DB_PATH:./data/checkout.db}?foreign_keys=true
     driver-class-name: org.sqlite.JDBC
     hikari:
       # SQLite admite un solo escritor a la vez; una conexión evita SQLITE_BUSY
       maximum-pool-size: 1
+  sql:
+    init:
+      # SQLite no se detecta como base embebida: sin "always" no se ejecutarían los scripts.
+      # Ambos son idempotentes; se copian desde packages/schema al compilar (ver pom.xml).
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/seed.sql
+      encoding: UTF-8
 
 app:
   cors:

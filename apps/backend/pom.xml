@@ -78,6 +78,20 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- El esquema vive en packages/schema (fuente única); se empaqueta en classpath:db/ -->
+            <resource>
+                <directory>${project.basedir}/../../packages/schema</directory>
+                <targetPath>db</targetPath>
+                <includes>
+                    <include>schema.sql</include>
+                    <include>seed.sql</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

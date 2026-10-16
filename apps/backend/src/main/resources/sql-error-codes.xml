@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN" "https://www.springframework.org/dtd/spring-beans-2.0.dtd">
+<!--
+    Spring no trae códigos de error para SQLite, y sqlite-jdbc no informa SQLState: sin esto,
+    una violación de FK o de CHECK llega como UncategorizedSQLException. Spring fusiona este
+    archivo con sus códigos por defecto y lo aplica a todo JdbcTemplate.
+    Códigos primarios de SQLite: https://www.sqlite.org/rescode.html
+-->
+<beans>
+    <bean id="SQLite" class="org.springframework.jdbc.support.SQLErrorCodes">
+        <property name="databaseProductName" value="SQLite"/>
+        <!-- 19 = SQLITE_CONSTRAINT: FK, CHECK, NOT NULL, UNIQUE y PRIMARY KEY -->
+        <property name="dataIntegrityViolationCodes" value="19"/>
+        <!-- 5 = SQLITE_BUSY, 6 = SQLITE_LOCKED -->
+        <property name="cannotAcquireLockCodes" value="5,6"/>
+    </bean>
+</beans>
