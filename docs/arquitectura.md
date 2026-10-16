@@ -50,13 +50,22 @@ Detalle, decisiones y pendientes de integración en [`packages/schema/README.md`
 ### Frontend (`apps/frontend/src/app`)
 
 ```
-core/       # Cliente HTTP, modelos generados del contrato, interceptores
+core/
+  api/      # CatalogApi (GET /products) y el token API_BASE_URL
+  models/   # Product, escrito a mano según el contrato (pendiente: generarlo)
+  money/    # formatMoney (formato del texto) y cents (aritmética exacta en centavos bigint)
 features/
-  catalog/  # Lista de productos (HU1)
-  cart/     # Estado del carrito con Signals (HU1)
-  checkout/ # Cupón, desglose y alerta del 35% (HU2, HU4)
+  catalog/  # CatalogPage: lista de productos y selección de cantidades (HU1)
+  cart/     # CartStore: estado del carrito con Signals (HU1)
+  checkout/ # CheckoutPage: por ahora solo resume la selección (pendiente: HU2, HU4)
 shared/     # Componentes de UI reutilizables
 ```
+
+- **El carrito guarda cantidades y muestra el subtotal.** `CartStore` guarda cada producto elegido con su cantidad. Al checkout solo envía `productId` y `quantity`. Muestra en tiempo real el subtotal antes de descuentos (precio × cantidad); los descuentos y el total final los calcula siempre el backend.
+- **Subtotal exacto en centavos `bigint`.** Para no romper la regla de no usar flotantes, `"89.90"` se convierte a `8990n` y se opera como entero: 3 × 89.90 da exactamente `269.70` (con `number` daría `269.70000000000005`). Se descartó llamar a `POST /checkouts/preview` en cada cambio: sería una petición por clic, y el subtotal no necesita reglas de negocio.
+- **Cantidades saneadas en el cliente.** Una cantidad negativa, decimal o no numérica se corrige a un entero entre 0 y `availableStock`. Al recargar el catálogo, `reconcile` recorta la selección al stock vigente y quita los productos que ya no están. Es una ayuda de UX: el backend vuelve a validar todo.
+- **Dinero solo como texto.** `formatMoney("1200.00")` da `"USD 1,200.00"` insertando separadores sobre el string, sin pasar por `number`.
+- **Accesibilidad básica:** `lang="es"`, enlace para saltar al contenido, un título de página por ruta, foco visible, etiquetas que nombran el producto ("Cantidad de Cuaderno"), botones `−`/`+` con nombre accesible, estados de carga (`role="status"`) y de error (`role="alert"`) anunciados, resumen del carrito en una región `aria-live`, áreas táctiles de 44 px y colores con contraste AA.
 
 ## 3. Aislamiento del motor de descuentos
 

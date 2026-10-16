@@ -58,7 +58,12 @@ npm ci
 npm start
 ```
 
-La aplicación queda en `http://localhost:4200`.
+La aplicación queda en `http://localhost:4200` y espera el backend en `http://localhost:8080/api/v1`.
+
+| Ruta | Vista |
+|---|---|
+| `/` | Selección de productos: catálogo con stock, cantidad por producto y subtotal en tiempo real |
+| `/checkout` | Checkout _(pendiente: cupón, desglose, alerta del 35% y confirmación)_ |
 
 ## Pruebas y cobertura
 
