@@ -89,7 +89,7 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 
 | `code` | HTTP | Cuándo | Campos extra |
 |---|---|---|---|
-| `VALIDATION_ERROR` | 400 | JSON corrupto, tipos incorrectos, cantidad < 1, una propiedad no permitida (p. ej. un precio) o una `Idempotency-Key` que no es UUID. | `errors[]` con `field` y `message` |
+| `VALIDATION_ERROR` | 400 | JSON corrupto, tipos incorrectos, cantidad < 1, más de 100 líneas en `items`, una propiedad no permitida (p. ej. un precio) o una `Idempotency-Key` que no es UUID. | `errors[]` con `field` y `message` |
 | `EMPTY_CART` | 400 | `items` vacío. | — |
 | `PRODUCT_NOT_FOUND` | 422 | El producto no existe o está inactivo. | `productId` |
 | `INVALID_COUPON` | 422 | El cupón no está registrado. | — |
@@ -99,6 +99,8 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 | `DATA_INTEGRITY_VIOLATION` | 422 | La base rechazó la orden por inconsistente; no se guardó. | — |
 | `DATABASE_UNAVAILABLE` | 503 | La base no está disponible por ahora; se puede reintentar. | — |
 | `PERSISTENCE_ERROR` | 500 | Error interno al procesar los datos. | — |
+| `PAYLOAD_TOO_LARGE` | 413 | El cuerpo supera 16 KB (`app.limits.max-body-size`). Se rechaza antes de leer el JSON. | — |
+| `TOO_MANY_REQUESTS` | 429 | La IP superó 60 peticiones por minuto entre `POST /checkouts` y `/checkouts/preview`, o acumuló 10 cupones rechazados en 15 minutos (`app.limits.*`). | Header `Retry-After` (segundos) |
 
 ## Decisiones
 
@@ -111,6 +113,8 @@ Problem Details (RFC 9457) con `Content-Type: application/problem+json` y un `co
 | Respuesta del checkout | Desglose completo con `capApplied` | Solo el `id` | El frontend no repite el cálculo: muestra lo que decidió el backend. |
 | Request cerrado | `additionalProperties: false` | Ignorar campos extra | Un precio enviado por el cliente se rechaza en lugar de ignorarse en silencio. |
 | Compra doble | Header opcional `Idempotency-Key` (UUID) en `POST /checkouts` | Bloquear solo en el cliente | Un reintento de red o un doble clic que el cliente no alcance a bloquear devuelve la misma orden (201, mismo `id`) sin reservar stock otra vez. "Mismo cuerpo" se compara por un hash del carrito normalizado (cantidades del mismo producto sumadas y ordenadas por `productId`) y el cupón; otro cuerpo con la misma clave es `IDEMPOTENCY_KEY_REUSED` (409). |
+
+| Límites contra abuso | `maxItems: 100`, cuerpo de 16 KB, rate limiting por IP con 429 y `Retry-After` | Sin límites | Sin ellos, un cliente puede forzar trabajo con cuerpos enormes o adivinar cupones, porque `INVALID_COUPON` confirma si un código existe. Tras 10 cupones rechazados la IP se bloquea un tiempo también con un cupón válido, así que la respuesta deja de servir como oráculo. |
 
 ## Pendientes
 

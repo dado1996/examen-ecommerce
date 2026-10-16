@@ -126,8 +126,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/InsufficientStock'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/BusinessRuleViolation'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/PersistenceError'
         '503':
@@ -206,8 +210,12 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/CheckoutConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/BusinessRuleViolation'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/PersistenceError'
         '503':
@@ -309,6 +317,11 @@ components:
         items:
           type: array
           minItems: 1
+          maxItems: 100
+          description: >
+            Como máximo 100 líneas: el backend busca cada una en el catálogo. Las
+            unidades van en `quantity`, así que un carrito real usa pocas líneas.
+            Con más de 100 responde `VALIDATION_ERROR` en el campo `items`.
           items:
             $ref: '#/components/schemas/CheckoutItemRequest'
         couponCode:
@@ -431,6 +444,8 @@ components:
         - DATA_INTEGRITY_VIOLATION
         - DATABASE_UNAVAILABLE
         - PERSISTENCE_ERROR
+        - PAYLOAD_TOO_LARGE
+        - TOO_MANY_REQUESTS
 
     Problem:
       description: >
@@ -616,6 +631,45 @@ components:
                 detail: El producto 999 no existe.
                 code: PRODUCT_NOT_FOUND
                 productId: 999
+
+    PayloadTooLarge:
+      description: >
+        `PAYLOAD_TOO_LARGE`: el cuerpo supera 16 KB. Se rechaza antes de leer el
+        JSON; un pedido de 100 líneas ocupa unos 4 KB.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Solicitud demasiado grande
+            status: 413
+            detail: El cuerpo de la solicitud supera el tamaño máximo permitido.
+            code: PAYLOAD_TOO_LARGE
+
+    TooManyRequests:
+      description: >
+        `TOO_MANY_REQUESTS`: la IP superó el límite de peticiones (60 por minuto entre
+        `POST /checkouts` y `/checkouts/preview`) o acumuló demasiados cupones
+        rechazados (10 cada 15 minutos). En el segundo caso se bloquea también con un
+        cupón válido, para no confirmar qué códigos existen. No se procesó la petición.
+      headers:
+        Retry-After:
+          description: Segundos que hay que esperar antes de reintentar.
+          schema:
+            type: integer
+            minimum: 1
+          example: 12
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: about:blank
+            title: Demasiadas solicitudes
+            status: 429
+            detail: Se superó el límite de solicitudes. Intenta de nuevo más tarde.
+            code: TOO_MANY_REQUESTS
 
     PersistenceError:
       description: '`PERSISTENCE_ERROR`: error interno al procesar los datos.'
