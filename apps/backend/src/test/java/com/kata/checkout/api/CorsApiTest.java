@@ -3,10 +3,12 @@ package com.kata.checkout.api;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.containsStringIgnoringCase;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 
 /**
  * Preflight CORS que hace el navegador antes de una petición con headers propios. MockMvc no lo
@@ -38,6 +40,19 @@ class CorsApiTest extends ApiIntegrationTest {
                         .header("Access-Control-Request-Headers", "content-type"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND));
+    }
+
+    @Test
+    void lasRespuestasDelCheckoutExponenRetryAfterAlFrontend() throws Exception {
+        // Retry-After no es un header "simple": sin exponerlo, el navegador no deja leerlo en una 429
+        mvc.perform(post("/api/v1/checkouts/preview")
+                        .header("Origin", FRONTEND)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\": [{\"productId\": 5, \"quantity\": 1}]}"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND))
+                .andExpect(header().string("Access-Control-Expose-Headers",
+                        containsStringIgnoringCase("retry-after")));
     }
 
     @Test

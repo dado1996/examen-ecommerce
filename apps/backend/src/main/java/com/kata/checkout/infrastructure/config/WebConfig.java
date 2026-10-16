@@ -9,6 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * CORS restringido a los orígenes configurados y solo a los métodos y headers que usa el frontend.
  * Cada header propio que envíe el frontend (p. ej. {@code Idempotency-Key}) debe estar en la lista:
  * si no, el navegador bloquea la petición en el preflight. {@code CorsApiTest} lo verifica.
+ * {@code Retry-After} se expone para que el frontend pueda leerlo en una respuesta 429.
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -24,6 +25,7 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST")
-                .allowedHeaders("Content-Type", "Idempotency-Key");
+                .allowedHeaders("Content-Type", "Idempotency-Key")
+                .exposedHeaders("Retry-After");
     }
 }

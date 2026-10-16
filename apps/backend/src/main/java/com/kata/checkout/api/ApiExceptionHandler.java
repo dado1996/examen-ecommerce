@@ -8,6 +8,7 @@ import com.kata.checkout.domain.exception.IdempotencyKeyReusedException;
 import com.kata.checkout.domain.exception.InsufficientStockException;
 import com.kata.checkout.domain.exception.InvalidCouponException;
 import com.kata.checkout.domain.exception.ProductNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
@@ -61,10 +62,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.badRequest().body(validationProblem(errors));
     }
 
-    /** JSON corrupto, tipo incorrecto o una propiedad no permitida (p. ej. un precio). */
+    /**
+     * JSON corrupto, tipo incorrecto o una propiedad no permitida (p. ej. un precio). Si la lectura
+     * se cortó por el límite de {@link BodySizeLimitFilter}, es 413 {@code PAYLOAD_TOO_LARGE}.
+     */
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException e,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        if (hasCause(e, PayloadTooLargeException.class)) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(problem(HttpStatus.PAYLOAD_TOO_LARGE,
+                    "PAYLOAD_TOO_LARGE", "Solicitud demasiado grande",
+                    "El cuerpo de la solicitud supera el tamaño máximo permitido."));
+        }
         return ResponseEntity.badRequest().body(validationProblem(List.of(unreadableField(e))));
     }
 
@@ -89,14 +98,17 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** Cada cupón rechazado cuenta para el bloqueo por IP de {@link RateLimitInterceptor}. */
     @ExceptionHandler(InvalidCouponException.class)
-    ProblemDetail invalidCoupon(InvalidCouponException e) {
+    ProblemDetail invalidCoupon(InvalidCouponException e, HttpServletRequest request) {
+        request.setAttribute(RateLimitInterceptor.COUPON_REJECTED, Boolean.TRUE);
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_COUPON", "Cupón inválido",
                 "El cupón no está registrado.");
     }
 
     @ExceptionHandler(CouponExpiredException.class)
-    ProblemDetail couponExpired(CouponExpiredException e) {
+    ProblemDetail couponExpired(CouponExpiredException e, HttpServletRequest request) {
+        request.setAttribute(RateLimitInterceptor.COUPON_REJECTED, Boolean.TRUE);
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "COUPON_EXPIRED", "Cupón vencido", "El cupón está vencido.");
     }
 
@@ -114,6 +126,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail idempotencyKeyReused(IdempotencyKeyReusedException e) {
         return problem(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", "Clave de idempotencia reutilizada",
                 "La clave de idempotencia ya se usó con otra solicitud.");
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ProblemDetail> tooManyRequests(RateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.retryAfterSeconds()))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "Demasiadas solicitudes",
+                        "Se superó el límite de solicitudes. Intenta de nuevo más tarde."));
     }
 
     /** FK o CHECK rechazados por la base: la orden tenía datos inconsistentes y no se guardó. */
@@ -144,6 +164,15 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 "El cuerpo de la solicitud no es válido.");
         problem.setProperty("errors", errors);
         return problem;
+    }
+
+    private static boolean hasCause(Throwable e, Class<? extends Throwable> type) {
+        for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Ubica el campo a partir de la ruta de Jackson, sin exponer su mensaje (nombra clases internas). */

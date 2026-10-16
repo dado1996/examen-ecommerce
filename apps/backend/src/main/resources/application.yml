@@ -34,6 +34,21 @@ spring:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  # Límites contra abuso (ver docs/arquitectura.md, sección 9). Responden 413 PAYLOAD_TOO_LARGE y 429 TOO_MANY_REQUESTS.
+  limits:
+    # Cuerpo máximo en /api/**. Un pedido de 100 líneas (el máximo de items) ocupa unos 4 KB;
+    # 16 KB deja margen para espacios y el cupón sin aceptar cuerpos que solo sirven para cargar el servidor.
+    max-body-size: 16KB
+    # POST /checkouts y /checkouts/preview por IP, en una sola cuenta: 60 por minuto, ráfagas incluidas.
+    # Una persona que cambia cantidades y cupones no se acerca; un script sí.
+    checkout-rate:
+      requests: 60
+      window: 1m
+    # Cupones rechazados (INVALID_COUPON o COUPON_EXPIRED) por IP antes de bloquearla en esos endpoints.
+    # 10 cada 15 minutos admite errores de tipeo y deja probar muy pocos códigos por hora.
+    coupon-failures:
+      requests: 10
+      window: 15m
 
 # Reglas de descuento parametrizables (ver docs/arquitectura.md, sección de supuestos).
 # Los decimales van entre comillas: sin ellas YAML los lee como double antes de convertirlos a BigDecimal.

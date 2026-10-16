@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.ResultMatcher;
@@ -25,9 +26,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 /**
  * Base de las pruebas de la API sobre la aplicación completa y un SQLite temporal propio. Cada
  * respuesta se valida contra {@code packages/contracts/openapi.yaml}.
+ *
+ * <p>Todas las peticiones de MockMvc salen de 127.0.0.1: el rate limiting se sube aquí para que las
+ * pruebas no se bloqueen entre sí. {@code RateLimitingApiTest} lo prueba con límites bajos.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {
+        "app.limits.checkout-rate.requests=100000",
+        "app.limits.coupon-failures.requests=100000"})
 abstract class ApiIntegrationTest {
 
     private static final Path DB_FILE = crearArchivoTemporal();
