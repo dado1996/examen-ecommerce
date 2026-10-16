@@ -5,7 +5,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** CORS restringido a los orígenes configurados y solo a los métodos que usa el frontend. */
+/**
+ * CORS restringido a los orígenes configurados y solo a los métodos y headers que usa el frontend.
+ * Cada header propio que envíe el frontend (p. ej. {@code Idempotency-Key}) debe estar en la lista:
+ * si no, el navegador bloquea la petición en el preflight. {@code CorsApiTest} lo verifica.
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
@@ -20,6 +24,6 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST")
-                .allowedHeaders("Content-Type");
+                .allowedHeaders("Content-Type", "Idempotency-Key");
     }
 }
