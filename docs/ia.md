@@ -56,10 +56,20 @@ _(pendiente: estimar al cierre, por módulo)_
 
 > Mínimo dos ejemplos concretos, con el criterio técnico que justificó la corrección.
 
-### Corrección 1
+### Corrección 1 — El header `Idempotency-Key` quedó bloqueado por CORS
 
-_(pendiente)_ — Sugerencia de la IA · Problema detectado · Corrección aplicada · Cómo se verificó.
+- **Sugerencia de la IA.** Una sesión de Claude Code implementó la clave de idempotencia en `POST /checkouts` de punta a punta: contrato, esquema, backend y frontend. Reportó `mvn verify` (190 pruebas), `npm run test:coverage` (145) y `verify.sh` en verde, y los cambios se commitearon. No actualizó la configuración CORS, que en `WebConfig` solo permitía `allowedHeaders("Content-Type")`.
+- **Problema detectado.** Al probar la compra en el navegador, el desarrollador obtuvo `Request header field Idempotency-Key is not allowed by Access-Control-Allow-Headers`. El navegador bloqueaba `POST /checkouts` en el preflight, así que ninguna compra llegaba al backend. Las pruebas no lo detectaron por dos razones: MockMvc no ejecuta el preflight CORS que hace un navegador, y no existía ninguna prueba de CORS. Todas las pruebas estaban en verde y la funcionalidad no servía en el navegador.
+- **Criterio técnico.** Un header propio nuevo cambia el contrato entre el navegador y el servidor, no solo entre el frontend y el backend. La protección contra la compra doble no sirve si el navegador impide enviar la clave.
+- **Corrección aplicada.** Primero se escribió `CorsApiTest`, con 4 pruebas de preflight: el header de idempotencia desde el frontend, el preview con `Content-Type`, y el rechazo de un origen no configurado y de un header no permitido. La primera falló con el mismo error del navegador. Después se agregó `Idempotency-Key` a `allowedHeaders`, con un comentario que avisa que cada header propio nuevo debe sumarse a esa lista.
+- **Cómo se verificó.** `mvn verify` en verde con 194 pruebas. Además se levantó una instancia temporal del backend en el puerto 8081 y se le hizo el mismo preflight que hace el navegador con `curl`. La instancia nueva respondió `Access-Control-Allow-Headers: content-type, idempotency-key`; el backend anterior respondía solo `content-type`. Commit `75dbb22`.
+- **Lección.** "Pruebas en verde" no equivale a "funciona en el navegador". Cada cambio que agrega headers, métodos u orígenes debe venir con una prueba de preflight.
 
-### Corrección 2
+### Corrección 2 — Con el tope aplicado, `HALF_EVEN` podía superar el 35%
 
-_(pendiente)_
+- **Sugerencia de la IA.** La sesión que implementó el motor de descuentos aplicó la regla técnica de `CLAUDE.md` tal cual: todos los totales finales se redondean `HALF_EVEN` a 2 decimales, también el descuento truncado por el tope.
+- **Problema detectado.** El agente `discount-auditor` lo señaló al auditar el motor. Con un subtotal de 100.10 y el tope en 0.35, el tope exacto es 35.035. `HALF_EVEN` lo redondea a **35.04**, medio centavo por encima del 35%. Eso viola la regla de negocio "el descuento total nunca supera el 35%" y el `CHECK` del contrato. Dos reglas de `CLAUDE.md` se contradecían: el redondeo `HALF_EVEN` y el tope que no se puede superar. La IA no resolvió el conflicto por su cuenta: lo reportó como decisión pendiente.
+- **Criterio técnico.** La regla de negocio está marcada como "no negociable" y la de redondeo es una regla técnica general. Cuando chocan, prevalece la de negocio. Redondear hacia abajo solo cuando se aplica el tope garantiza que el descuento nunca lo supere, y deja intacto `HALF_EVEN` en todos los demás casos. La alternativa descartada era relajar el contrato para tolerar medio centavo por encima del tope, lo que habría debilitado la regla.
+- **Corrección aplicada.** El desarrollador decidió usar `RoundingMode.DOWN` cuando se aplica el tope. Primero se escribieron dos pruebas: con 100.10 y el tope activo, el descuento debe ser `35.03` y el total `65.07`; sin tope, el redondeo debe seguir siendo `HALF_EVEN` (0.50 × 0.15 = 0.075 → `0.08`). Después se cambió `DiscountEngine` y se documentó la excepción en `CLAUDE.md`, en `docs/arquitectura.md` y en el contrato (`Money` y `CheckoutBreakdown`). Commits `e4cac1e` (motor) y `9fdfdda` (documentación).
+- **Cómo se verificó.** `mvn verify` en verde con 166 pruebas. Más adelante, en la prueba de mutación manual de los casos de borde, el mutante "con tope se redondea `HALF_EVEN` en vez de `DOWN`" fue detectado por `conElTopeAplicadoElDescuentoSeRedondeaHaciaAbajoParaNoSuperarElTreintaYCincoPorCiento`.
+- **Efecto en el frontend.** El mismo caso descuadraba el desglose en pantalla: el ajuste del tope (5.005) redondeado `HALF_EVEN` da 5.00, pero 40.04 − 5.00 = 35.04 no coincide con el 35.03 del backend. Se corrigió calculando el ajuste como la suma de los pasos redondeados menos el `discountTotal` del backend (5.01). Lo cubre una prueba de `breakdownRows`.
