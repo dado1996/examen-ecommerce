@@ -1,22 +1,4 @@
 import { ApiProblem } from '../../core/api/problem';
-import { AppliedDiscount } from '../../core/models/checkout';
-import { formatMoney } from '../../core/money/format-money';
-import { formatRate } from '../../core/money/decimal';
-
-/** Nombre legible de un paso de la cascada de descuentos. */
-export function describeDiscount(discount: AppliedDiscount): string {
-  const rate = formatRate(discount.rate);
-  switch (discount.rule) {
-    case 'CATEGORY':
-      return `Categoría ${discount.reference ?? ''} (${rate})`;
-    case 'VOLUME':
-      return `Volumen: compra mayor que ${formatMoney(discount.reference ?? '')} (${rate})`;
-    case 'COUPON':
-      return `Cupón ${discount.reference ?? ''} (${rate})`;
-    case 'CAP':
-      return `Ajuste por tope máximo del ${rate}`;
-  }
-}
 
 /** Errores que se muestran junto al campo del cupón en lugar de una alerta general. */
 export function isCouponError(code: ApiProblem['code']): boolean {

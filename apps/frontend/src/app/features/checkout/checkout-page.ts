@@ -1,15 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 
-import { describeDiscount, errorMessage, isCouponError } from './checkout-messages';
+import { errorMessage, isCouponError } from './checkout-messages';
 import { CheckoutApi } from '../../core/api/checkout-api';
 import { ApiProblem, readProblem } from '../../core/api/problem';
-import { CheckoutBreakdown } from '../../core/models/checkout';
-import { centsToAmount, toCents } from '../../core/money/cents';
-import { formatRate, roundToCents } from '../../core/money/decimal';
+import { CheckoutBreakdown, CheckoutRequest } from '../../core/models/checkout';
+import { formatRate } from '../../core/money/decimal';
 import { formatMoney } from '../../core/money/format-money';
+import { BreakdownPanel } from '../../shared/ui/breakdown-panel';
 import { CartStore } from '../cart/cart-store';
+import { ConfirmationStore } from '../confirmation/confirmation-store';
 
 type PreviewState =
   | { readonly status: 'idle' }
@@ -17,42 +19,43 @@ type PreviewState =
   | { readonly status: 'applied'; readonly breakdown: CheckoutBreakdown }
   | { readonly status: 'error'; readonly problem: ApiProblem };
 
-interface BreakdownRow {
-  readonly label: string;
-  readonly value: string;
-  readonly kind: 'subtotal' | 'discount' | 'adjustment' | 'discount-total' | 'total';
-}
-
 /**
- * Checkout (HU2, HU4): productos del carrito, cupón y desglose de descuentos. "Aplicar
- * descuento" pide a `POST /checkouts/preview` que valide el cupón contra la configuración y
- * calcule la cascada completa (categoría, volumen, cupón y tope), sin guardar ni reservar.
+ * Checkout (HU2, HU3, HU4): productos del carrito, cupón, desglose de descuentos y pago.
+ * - "Aplicar descuento" pide a `POST /checkouts/preview` que valide el cupón contra la
+ *   configuración y calcule la cascada completa, sin guardar ni reservar.
+ * - "Ir a pagar" confirma con `POST /checkouts`, que vuelve a validar todo, reserva el stock y
+ *   guarda la orden. Con éxito vacía el carrito y lleva a la confirmación.
  * Solo se llega con productos en el carrito (`cartNotEmptyGuard`).
- * _(pendiente: confirmar la compra con POST /checkouts)_
  */
 @Component({
   selector: 'app-checkout-page',
-  imports: [RouterLink],
+  imports: [RouterLink, BreakdownPanel],
   templateUrl: './checkout-page.html',
   styleUrl: './checkout-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CheckoutPage {
   private readonly api = inject(CheckoutApi);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmation = inject(ConfirmationStore);
   protected readonly cart = inject(CartStore);
   protected readonly formatMoney = formatMoney;
 
   protected readonly preview = signal<PreviewState>({ status: 'idle' });
+  protected readonly paying = signal(false);
+  private readonly paymentProblem = signal<ApiProblem | null>(null);
 
   protected readonly loading = computed(() => this.preview().status === 'loading');
+  /** Hay una petición en curso: ningún botón puede disparar otra (evita una compra doble). */
+  protected readonly busy = computed(() => this.loading() || this.paying());
   protected readonly breakdown = computed(() => {
     const state = this.preview();
     return state.status === 'applied' ? state.breakdown : null;
   });
   private readonly problem = computed(() => {
     const state = this.preview();
-    return state.status === 'error' ? state.problem : null;
+    return this.paymentProblem() ?? (state.status === 'error' ? state.problem : null);
   });
   protected readonly couponError = computed(() => {
     const problem = this.problem();
@@ -66,14 +69,11 @@ export class CheckoutPage {
     const breakdown = this.breakdown();
     return breakdown ? formatRate(breakdown.maxDiscountRate) : '';
   });
-  protected readonly rows = computed(() => {
-    const breakdown = this.breakdown();
-    return breakdown ? toRows(breakdown) : [];
-  });
 
   protected onCouponInput(event: Event): void {
     this.cart.setCouponCode((event.target as HTMLInputElement).value);
     // El desglose o el error anteriores ya no corresponden al cupón escrito
+    this.paymentProblem.set(null);
     if (!this.loading()) {
       this.preview.set({ status: 'idle' });
     }
@@ -81,12 +81,13 @@ export class CheckoutPage {
 
   protected applyDiscount(event: Event): void {
     event.preventDefault();
-    if (this.loading()) {
+    if (this.busy()) {
       return;
     }
+    this.paymentProblem.set(null);
     this.preview.set({ status: 'loading' });
     this.api
-      .preview({ items: this.cart.lines(), couponCode: this.cart.normalizedCoupon() })
+      .preview(this.request())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (breakdown) => this.preview.set({ status: 'applied', breakdown }),
@@ -94,32 +95,34 @@ export class CheckoutPage {
       });
   }
 
+  protected pay(): void {
+    if (this.busy()) {
+      return;
+    }
+    this.paymentProblem.set(null);
+    this.paying.set(true);
+    this.api
+      .create(this.request())
+      .pipe(
+        finalize(() => this.paying.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (checkout) => {
+          this.confirmation.set(checkout);
+          this.cart.clear();
+          void this.router.navigateByUrl('/confirmacion');
+        },
+        error: (error: unknown) => this.paymentProblem.set(readProblem(error)),
+      });
+  }
+
+  /** Lo único que se envía: productos, cantidades y cupón. El backend pone los precios. */
+  private request(): CheckoutRequest {
+    return { items: this.cart.lines(), couponCode: this.cart.normalizedCoupon() };
+  }
+
   private productName(productId: number): string | undefined {
     return this.cart.items().find((item) => item.product.id === productId)?.product.name;
   }
-}
-
-/**
- * Filas del desglose. Cada paso se muestra redondeado HALF_EVEN, y el ajuste del tope se
- * calcula como la suma de esos pasos menos el descuento total del backend, para que el
- * desglose cuadre a la vista.
- */
-function toRows(breakdown: CheckoutBreakdown): BreakdownRow[] {
-  const rows: BreakdownRow[] = [{ label: 'Subtotal', value: formatMoney(breakdown.subtotal), kind: 'subtotal' }];
-  let roundedSum = 0n;
-  for (const discount of breakdown.discounts) {
-    if (discount.rule === 'CAP') {
-      const adjustment = centsToAmount(roundedSum - toCents(breakdown.discountTotal));
-      rows.push({ label: describeDiscount(discount), value: `+${formatMoney(adjustment)}`, kind: 'adjustment' });
-    } else {
-      const amount = roundToCents(discount.amount);
-      roundedSum += toCents(amount);
-      rows.push({ label: describeDiscount(discount), value: `−${formatMoney(amount)}`, kind: 'discount' });
-    }
-  }
-  rows.push(
-    { label: 'Descuento total', value: `−${formatMoney(breakdown.discountTotal)}`, kind: 'discount-total' },
-    { label: 'Total a pagar', value: formatMoney(breakdown.total), kind: 'total' },
-  );
-  return rows;
 }

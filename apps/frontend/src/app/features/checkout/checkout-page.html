@@ -58,7 +58,7 @@
         [value]="cart.couponCode()"
         (input)="onCouponInput($event)"
       />
-      <button type="submit" class="button button--primary" [disabled]="loading()">
+      <button type="submit" class="button" [disabled]="busy()">
         {{ loading() ? 'Calculando…' : 'Aplicar descuento' }}
       </button>
     </div>
@@ -94,20 +94,17 @@
 
   <div aria-live="polite">
     @if (breakdown(); as result) {
-      <section class="breakdown-panel" aria-labelledby="breakdown-title">
-        <h3 id="breakdown-title">Desglose de descuentos</h3>
-        @if (result.discounts.length === 0) {
-          <p class="breakdown-panel__empty">Ningún descuento aplica a este carrito.</p>
-        }
-        <dl class="breakdown">
-          @for (row of rows(); track row.label) {
-            <div [class]="'breakdown__row breakdown__row--' + row.kind">
-              <dt>{{ row.label }}</dt>
-              <dd>{{ row.value }}</dd>
-            </div>
-          }
-        </dl>
-      </section>
+      <app-breakdown-panel [breakdown]="result" />
     }
+  </div>
+
+  <div class="pay">
+    <p class="pay__hint">
+      Al pagar se confirma la compra: se validan de nuevo los productos, el stock y los descuentos,
+      y se guarda la orden.
+    </p>
+    <button type="button" class="button button--primary pay__button" [disabled]="busy()" (click)="pay()">
+      {{ paying() ? 'Procesando pago…' : 'Ir a pagar' }}
+    </button>
   </div>
 </section>

@@ -1,33 +1,4 @@
-import { describeDiscount, errorMessage, isCouponError } from './checkout-messages';
-import { AppliedDiscount } from '../../core/models/checkout';
-
-function paso(parcial: Partial<AppliedDiscount> & Pick<AppliedDiscount, 'rule'>): AppliedDiscount {
-  return { step: 1, rate: '0.10', reference: null, baseAmount: '100.00', amount: '10.00', ...parcial };
-}
-
-describe('describeDiscount', () => {
-  it('nombra el descuento de categoría con la categoría y el porcentaje', () => {
-    expect(describeDiscount(paso({ rule: 'CATEGORY', rate: '0.10', reference: 'Tecnología' }))).toBe(
-      'Categoría Tecnología (10%)',
-    );
-  });
-
-  it('nombra el descuento por volumen con su umbral', () => {
-    expect(describeDiscount(paso({ rule: 'VOLUME', rate: '0.05', reference: '100.00' }))).toBe(
-      'Volumen: compra mayor que USD 100.00 (5%)',
-    );
-  });
-
-  it('nombra el cupón con su código', () => {
-    expect(describeDiscount(paso({ rule: 'COUPON', rate: '0.15', reference: 'WELCOME2026' }))).toBe(
-      'Cupón WELCOME2026 (15%)',
-    );
-  });
-
-  it('explica el ajuste del tope máximo', () => {
-    expect(describeDiscount(paso({ rule: 'CAP', rate: '0.35' }))).toBe('Ajuste por tope máximo del 35%');
-  });
-});
+import { errorMessage, isCouponError } from './checkout-messages';
 
 describe('errorMessage', () => {
   it('explica un cupón no registrado o vencido', () => {

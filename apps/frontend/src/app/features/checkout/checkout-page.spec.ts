@@ -1,13 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { Observable, of, Subject, throwError } from 'rxjs';
 
 import { CheckoutPage } from './checkout-page';
 import { CheckoutApi } from '../../core/api/checkout-api';
-import { CheckoutBreakdown, CheckoutRequest } from '../../core/models/checkout';
+import { Checkout, CheckoutBreakdown, CheckoutRequest } from '../../core/models/checkout';
 import { Product } from '../../core/models/product';
 import { CartStore } from '../cart/cart-store';
+import { ConfirmationStore } from '../confirmation/confirmation-store';
 
 const laptop: Product = { id: 1, name: 'Laptop 14"', unitPrice: '1200.00', category: 'Tecnología', availableStock: 5 };
 const teclado: Product = { id: 3, name: 'Teclado mecánico', unitPrice: '89.90', category: 'Tecnología', availableStock: 20 };
@@ -46,12 +47,20 @@ function problema(status: number, body: Record<string, unknown>): HttpErrorRespo
 }
 
 /** Doble de prueba del cliente: registra lo que se envía y devuelve lo que cada prueba decida. */
-class CheckoutApiFalso implements Pick<CheckoutApi, 'preview'> {
+const ordenConfirmada: Checkout = { ...desgloseConCupon, id: 42, createdAt: '2026-10-15T19:30:00.000Z' };
+
+class CheckoutApiFalso implements Pick<CheckoutApi, 'preview' | 'create'> {
   enviados: CheckoutRequest[] = [];
+  compras: CheckoutRequest[] = [];
   respuesta: () => Observable<CheckoutBreakdown> = () => of(desgloseConCupon);
+  respuestaCompra: () => Observable<Checkout> = () => of(ordenConfirmada);
   preview(request: CheckoutRequest): Observable<CheckoutBreakdown> {
     this.enviados.push(request);
     return this.respuesta();
+  }
+  create(request: CheckoutRequest): Observable<Checkout> {
+    this.compras.push(request);
+    return this.respuestaCompra();
   }
 }
 
@@ -94,6 +103,19 @@ describe('CheckoutPage', () => {
     const input = campoCupon();
     input.value = valor;
     input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+  }
+
+  function botonPagar(): HTMLButtonElement {
+    const boton = [...page.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
+      b.textContent?.includes('pagar') || b.textContent?.includes('Procesando'),
+    );
+    if (!boton) throw new Error('No se encontró el botón de ir a pagar');
+    return boton;
+  }
+
+  async function pagar(): Promise<void> {
+    botonPagar().click();
     await fixture.whenStable();
   }
 
@@ -380,5 +402,98 @@ describe('CheckoutPage', () => {
     await fixture.whenStable();
     expect(botonAplicar().disabled).toBe(false);
     expect(botonAplicar().textContent).toContain('Aplicar descuento');
+  });
+  it('el botón de ir a pagar está al final de la vista', async () => {
+    await render();
+
+    const botones = [...page.querySelectorAll('button')];
+    expect(botones.at(-1)?.textContent?.trim()).toBe('Ir a pagar');
+    expect(botonPagar().type).toBe('button');
+  });
+
+  it('ir a pagar envía a POST /checkouts solo productos, cantidades y el cupón escrito', async () => {
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await render();
+    await escribirCupon(' WELCOME2026 ');
+
+    await pagar();
+
+    expect(api.compras).toEqual([
+      {
+        items: [
+          { productId: 1, quantity: 2 },
+          { productId: 3, quantity: 3 },
+        ],
+        couponCode: 'WELCOME2026',
+      },
+    ]);
+  });
+
+  it('con la compra confirmada guarda la orden, vacía el carrito y lleva a la confirmación', async () => {
+    const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await render();
+
+    await pagar();
+
+    expect(TestBed.inject(ConfirmationStore).checkout()).toEqual(ordenConfirmada);
+    expect(cart.isEmpty()).toBe(true);
+    expect(navegar).toHaveBeenCalledWith('/confirmacion');
+  });
+
+  it('mientras procesa el pago deshabilita ambos botones para evitar una compra doble', async () => {
+    const pendiente = new Subject<Checkout>();
+    api.respuestaCompra = () => pendiente;
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await render();
+
+    await pagar();
+    expect(botonPagar().disabled).toBe(true);
+    expect(botonPagar().textContent).toContain('Procesando');
+    expect(botonAplicar().disabled).toBe(true);
+    botonPagar().click();
+    expect(api.compras).toHaveLength(1);
+
+    pendiente.next(ordenConfirmada);
+    pendiente.complete();
+    await fixture.whenStable();
+  });
+
+  it('si el pago falla por stock conserva el carrito y explica qué producto falta', async () => {
+    const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    api.respuestaCompra = () =>
+      throwError(() => problema(409, { code: 'INSUFFICIENT_STOCK', productId: 1, requested: 2, available: 1 }));
+    await render();
+
+    await pagar();
+
+    expect(page.querySelector('[role="alert"]')?.textContent).toContain('No hay stock suficiente de Laptop 14"');
+    expect(cart.isEmpty()).toBe(false);
+    expect(navegar).not.toHaveBeenCalled();
+    expect(botonPagar().disabled).toBe(false);
+  });
+
+  it('si el pago falla por el cupón lo marca junto al campo', async () => {
+    api.respuestaCompra = () => throwError(() => problema(422, { code: 'COUPON_EXPIRED' }));
+    await render();
+    await escribirCupon('WELCOME2026');
+
+    await pagar();
+
+    expect(page.querySelector('#coupon-error')?.textContent).toContain('El cupón ya venció');
+    expect(campoCupon().getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('si la base no está disponible permite reintentar el pago', async () => {
+    let intentos = 0;
+    api.respuestaCompra = () =>
+      ++intentos === 1 ? throwError(() => problema(503, { code: 'DATABASE_UNAVAILABLE' })) : of(ordenConfirmada);
+    const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    await render();
+
+    await pagar();
+    expect(page.querySelector('[role="alert"]')?.textContent).toContain('Intenta de nuevo');
+
+    await pagar();
+    expect(navegar).toHaveBeenCalledWith('/confirmacion');
   });
 });
